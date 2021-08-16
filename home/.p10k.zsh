@@ -902,7 +902,7 @@
 
   ###[ virtualenv: python virtual environment (https://docs.python.org/3/library/venv.html) ]###
   # Python virtual environment color.
-  typeset -g POWERLEVEL9K_VIRTUALENV_FOREGROUND=37
+  typeset -g POWERLEVEL9K_VIRTUALENV_FOREGROUND=069
   # Don't show Python version next to the virtual environment name.
   typeset -g POWERLEVEL9K_VIRTUALENV_SHOW_PYTHON_VERSION=false
   # If set to "false", won't show virtualenv if pyenv is already shown.
@@ -912,6 +912,8 @@
   typeset -g POWERLEVEL9K_VIRTUALENV_{LEFT,RIGHT}_DELIMITER=
   # Custom icon.
   # typeset -g POWERLEVEL9K_VIRTUALENV_VISUAL_IDENTIFIER_EXPANSION='⭐'
+  typeset -g POWERLEVEL9K_VIRTUALENV_PREFIX='%069F('
+  typeset -g POWERLEVEL9K_VIRTUALENV_SUFFIX='%069F)'
 
   #####################[ anaconda: conda environment (https://conda.io/) ]######################
   # Anaconda environment color.
@@ -948,7 +950,7 @@
 
   ################[ pyenv: python environment (https://github.com/pyenv/pyenv) ]################
   # Pyenv color.
-  typeset -g POWERLEVEL9K_PYENV_FOREGROUND=37
+  typeset -g POWERLEVEL9K_PYENV_FOREGROUND=069
   # Hide python version if it doesn't come from one of these sources.
   typeset -g POWERLEVEL9K_PYENV_SOURCES=(shell local global)
   # If set to false, hide python version if it's the same as global:

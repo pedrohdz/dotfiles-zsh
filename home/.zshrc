@@ -155,6 +155,23 @@ function update_terminal_cwd()
 add-zsh-hook chpwd update_terminal_cwd
 update_terminal_cwd
 
+function py-activate()
+{
+  # Is there a local virtualenv
+  local l_activate="$PWD/.venv/bin/activate"
+  if [ ! -e "$l_activate" ]; then
+    echo "ERROR - Could not find '$l_activate'"
+    return 1
+  fi
+
+  echo "Activating: $l_activate"
+  source "$l_activate"
+  if [ $? -ne 0 ]; then
+    echo "ERROR - Failed to exectute '$l_activate'"
+    return 1
+  fi
+}
+
 
 #------------------------------------------------------------------------------
 # BS gaurd
