@@ -71,6 +71,11 @@ antigen bundle terraform
 antigen bundle tmux
 antigen bundle vi-mode
 
+antigen bundle zsh-users/zsh-autosuggestions
+antigen bundle zsh-users/zsh-syntax-highlighting
+#antigen bundle jeffreytse/zsh-vi-mode  # NEVER use again.  Messes with cursor
+#antigen bundle softmoth/zsh-vim-mode  # TODO - Fails to load
+
 antigen apply
 
 
