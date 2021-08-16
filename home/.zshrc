@@ -1,6 +1,7 @@
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
+typeset -g POWERLEVEL9K_INSTANT_PROMPT=quiet
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
@@ -53,7 +54,7 @@ fi
 # Antigen
 #------------------------------------------------------------------------------
 source ~/.local/lib/zsh/antigen/antigen.zsh
-antigen use oh-my-zsh
+antigen use oh-my-zsh  # TODO - Can we remove this? Loads the oh-my-zsh's library.
 
 antigen theme romkatv/powerlevel10k
 
@@ -121,3 +122,42 @@ fi
 if which python > /dev/null; then
   alias jsonpp='python -m json.tool'
 fi
+
+
+#------------------------------------------------------------------------------
+# Functions
+#------------------------------------------------------------------------------
+# Thank you: https://github.com/scriptingosx/dotfiles/blob/master/zshfunctions/update_terminal_pwd
+function update_terminal_cwd()
+{
+  # Percent-encode the pathname.
+  local url_path=''
+  {
+    # Use LC_CTYPE=C to process text byte-by-byte. Ensure that
+    # LC_ALL isn't set, so it doesn't interfere.
+    local i ch hexch LC_CTYPE=C LC_ALL=
+    for (( i = 1; i <= ${#PWD}; ++i)); do
+      ch="$PWD[i]"
+      if [[ "$ch" =~ [/._~A-Za-z0-9-] ]]; then
+        url_path+="$ch"
+      else
+        printf -v hexch "%02X" "'$ch"
+        # printf treats values greater than 127 as
+        # negative and pads with "FF", so truncate.
+        url_path+="%${hexch: -2:2}"
+      fi
+    done
+  }
+
+  printf '\033]2;%s - %s\07' "${USER}@${HOST}" "$url_path"
+}
+
+add-zsh-hook chpwd update_terminal_cwd
+update_terminal_cwd
+
+
+#------------------------------------------------------------------------------
+# BS gaurd
+#------------------------------------------------------------------------------
+# Stop processing at this point!
+return 0
