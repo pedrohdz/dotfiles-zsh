@@ -7,24 +7,26 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
 fi
 
 
-#==============================================================================
-# Zsh managed
-#==============================================================================
-# The following lines were added by compinstall
-zstyle ':completion:*' completer _expand _complete _ignored
-zstyle ':completion:*' group-name ''
-zstyle ':completion:*' insert-unambiguous false
-zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
-zstyle ':completion:*' matcher-list '+' 'l:|=* r:|=*'
-zstyle ':completion:*' menu select=long
-zstyle ':completion:*' original true
-zstyle ':completion:*' select-prompt '%SScrolling active: current selection at %p%s'
-zstyle ':completion:*' verbose true
-zstyle :compinstall filename '/Users/pedro/.zshrc'
+fpath=($HOME/.homesick/repos/homeshick/completions $fpath)
 
-autoload -Uz compinit
-compinit
-# End of lines added by compinstall
+#------------------------------------------------------------------------------
+# Antigen
+#------------------------------------------------------------------------------
+source ~/.local/lib/zsh/antigen/antigen.zsh
+
+antigen theme romkatv/powerlevel10k
+antigen bundle vi-mode
+antigen bundle zsh-users/zsh-autosuggestions
+
+# TODO:
+#  - https://github.com/Aloxaf/fzf-tab
+
+# Plugin fails:
+#  - jeffreytse/zsh-vi-mode - NEVER use again.  Messes with cursor
+#  - softmoth/zsh-vim-mode - Fails to load
+#  - zsh-users/zsh-syntax-highlighting - terrible performance and buggy
+
+antigen apply
 
 
 #------------------------------------------------------------------------------
@@ -34,6 +36,9 @@ HISTFILE=~/.zsh_history
 HISTSIZE=5000
 SAVEHIST=2500
 #bindkey -v
+
+setopt bash_autolist
+setopt no_share_history
 
 bindkey '\e[A' history-beginning-search-backward
 bindkey '\e[B' history-beginning-search-forward
@@ -46,47 +51,31 @@ fi
 
 if which less > /dev/null; then
   export PAGER="$(which less)"
+  export LESS="-F -X $LESS"
   export MANPAGER="$(which less) -is"
 fi
 
 
 #------------------------------------------------------------------------------
-# Antigen
+# fzf
 #------------------------------------------------------------------------------
-source ~/.local/lib/zsh/antigen/antigen.zsh
-antigen use oh-my-zsh  # TODO - Can we remove this? Loads the oh-my-zsh's library.
+if which fzf > /dev/null; then
+  export FZF_DEFAULT_OPTS='--height 40%'
+  export FZF_COMPLETION_OPTS='--height 40% --reverse --info=inline'
+  export FZF_CTRL_T_OPTS=$FZF_COMPLETION_OPTS
+  export FZF_CTRL_R_OPTS=$FZF_COMPLETION_OPTS
+  if which fd > /dev/null; then
+    export FZF_DEFAULT_COMMAND='command fd --hidden --follow --exclude .git'
 
-antigen theme romkatv/powerlevel10k
+    _fzf_compgen_path() {
+      command fd --hidden --follow --exclude '.git' . "$1"
+    }
 
-antigen bundle aws
-antigen bundle command-not-found
-antigen bundle git
-antigen bundle kubectl
-antigen bundle kubectx
-antigen bundle macports
-antigen bundle minikube
-antigen bundle nmap
-antigen bundle osx
-antigen bundle pip
-antigen bundle terraform
-antigen bundle tmux
-antigen bundle vi-mode
-
-antigen bundle zsh-users/zsh-autosuggestions
-antigen bundle zsh-users/zsh-syntax-highlighting
-#antigen bundle jeffreytse/zsh-vi-mode  # NEVER use again.  Messes with cursor
-#antigen bundle softmoth/zsh-vim-mode  # TODO - Fails to load
-
-antigen apply
-
-
-#------------------------------------------------------------------------------
-# Includes
-#------------------------------------------------------------------------------
-source "$HOME/.homesick/repos/homeshick/homeshick.sh"
-[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
-
-fpath=($HOME/.homesick/repos/homeshick/completions $fpath)
+    _fzf_compgen_dir() {
+      command fd --type d --hidden --follow --exclude '.git' . "$1"
+    }
+  fi
+fi
 
 
 #------------------------------------------------------------------------------
@@ -101,6 +90,8 @@ if which dircolors > /dev/null; then
   alias grep='grep --color=auto'
   alias fgrep='fgrep --color=auto'
   alias egrep='egrep --color=auto'
+
+  export LESS="--use-color $LESS"
 fi
 
 alias ll='ls -lF'
@@ -152,9 +143,6 @@ function update_terminal_cwd()
   printf '\033]2;%s - %s\07' "${USER}@${HOST}" "$url_path"
 }
 
-add-zsh-hook chpwd update_terminal_cwd
-update_terminal_cwd
-
 function py-activate()
 {
   # Is there a local virtualenv
@@ -171,6 +159,63 @@ function py-activate()
     return 1
   fi
 }
+
+function _source_includes()
+{
+  local _local_prefix
+  if which port > /dev/null; then
+    _local_prefix=$(dirname "$(dirname "$(which port)")")
+  else
+    _local_prefix='/usr/local'
+  fi
+
+  # local _brew_prefix
+  # if which brew > /dev/null; then
+  #   _brew_prefix=$(brew --prefix)
+  # else
+  #   _brew_prefix='/DOES/NOT/EXIST'
+  # fi
+
+  local _includes
+  _includes=( \
+    "$HOME/.p10k.zsh" \
+    "$HOME/.homesick/repos/homeshick/homeshick.sh" \
+    "$_local_prefix/share/fzf/shell/key-bindings.zsh" \
+    "$_local_prefix/share/zsh/site-functions/_fzf" \  # Broken, does not get loaded with $fpath, so sourcing directly
+  )
+
+  for _file in "${_includes[@]}"; do
+    if [[ -f $_file ]]; then
+      #echo "Processing: $_file"
+      source "$_file"
+    fi
+  done
+}
+
+_source_includes
+add-zsh-hook chpwd update_terminal_cwd
+update_terminal_cwd
+
+
+#==============================================================================
+# Zsh managed
+#==============================================================================
+# Warning - Must run after `dircolors` to load `LS_COLORS`.
+# The following lines were added by compinstall
+zstyle ':completion:*' completer _expand _complete _ignored
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*' insert-unambiguous false
+zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
+zstyle ':completion:*' matcher-list '+' 'l:|=* r:|=*'
+zstyle ':completion:*' menu select=long
+zstyle ':completion:*' original true
+zstyle ':completion:*' select-prompt '%SScrolling active: current selection at %p%s'
+zstyle ':completion:*' verbose true
+zstyle :compinstall filename '/Users/pedro/.zshrc'
+
+autoload -Uz compinit
+compinit
+# End of lines added by compinstall
 
 
 #------------------------------------------------------------------------------
