@@ -215,7 +215,7 @@ zstyle ':completion:*' menu select=long
 zstyle ':completion:*' original true
 zstyle ':completion:*' select-prompt '%SScrolling active: current selection at %p%s'
 zstyle ':completion:*' verbose true
-zstyle :compinstall filename '/Users/pedro/.zshrc'
+zstyle :compinstall filename "$HOME/.zshrc"
 
 autoload -Uz compinit
 compinit
