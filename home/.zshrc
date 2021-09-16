@@ -7,7 +7,11 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
 fi
 
 
-fpath=($HOME/.homesick/repos/homeshick/completions $fpath)
+fpath=( \
+  $HOME/.homesick/repos/homeshick/completions \
+  $HOME/.local/share/zsh/site-functions \
+  $fpath \
+)
 
 #------------------------------------------------------------------------------
 # Antigen
@@ -39,6 +43,7 @@ SAVEHIST=2500
 
 setopt bash_autolist
 setopt no_share_history
+unsetopt correct_all
 
 bindkey '\e[A' history-beginning-search-backward
 bindkey '\e[B' history-beginning-search-forward
@@ -51,7 +56,6 @@ fi
 
 if which less > /dev/null; then
   export PAGER="$(which less)"
-  export LESS="-F -X $LESS"
   export MANPAGER="$(which less) -is"
 fi
 
@@ -91,7 +95,7 @@ if which dircolors > /dev/null; then
   alias fgrep='fgrep --color=auto'
   alias egrep='egrep --color=auto'
 
-  export LESS="--use-color $LESS"
+  export LESS="-RX --use-color $LESS"
 fi
 
 alias ll='ls -lF'
@@ -198,13 +202,13 @@ update_terminal_cwd
 
 
 #==============================================================================
-# Zsh managed
+# Completion
 #==============================================================================
 # Warning - Must run after `dircolors` to load `LS_COLORS`.
 # The following lines were added by compinstall
 zstyle ':completion:*' completer _expand _complete _ignored
 zstyle ':completion:*' group-name ''
-zstyle ':completion:*' insert-unambiguous false
+zstyle ':completion:*' insert-unambiguous true
 zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
 zstyle ':completion:*' matcher-list '+' 'l:|=* r:|=*'
 zstyle ':completion:*' menu select=long
@@ -215,7 +219,6 @@ zstyle :compinstall filename '/Users/pedro/.zshrc'
 
 autoload -Uz compinit
 compinit
-# End of lines added by compinstall
 
 
 #------------------------------------------------------------------------------
@@ -223,3 +226,6 @@ compinit
 #------------------------------------------------------------------------------
 # Stop processing at this point!
 return 0
+
+#autoload -U +X bashcompinit && bashcompinit
+#complete -o nospace -C /opt/devenv/bin/terraform terraform
