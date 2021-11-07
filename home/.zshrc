@@ -210,8 +210,8 @@ zstyle ':completion:*' completer _expand _complete _ignored
 zstyle ':completion:*' group-name ''
 zstyle ':completion:*' insert-unambiguous true
 zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
-zstyle ':completion:*' matcher-list '+' 'l:|=* r:|=*'
-zstyle ':completion:*' menu select=long
+zstyle ':completion:*' matcher-list ''
+zstyle ':completion:*' menu yes=long select=0
 zstyle ':completion:*' original true
 zstyle ':completion:*' select-prompt '%SScrolling active: current selection at %p%s'
 zstyle ':completion:*' verbose true
