@@ -49,17 +49,6 @@ bindkey '\e[A' history-beginning-search-backward
 bindkey '\e[B' history-beginning-search-forward
 
 
-if which vim > /dev/null; then
-  export EDITOR="$(which vim)"
-  export VISUAL="$(which vim)"
-fi
-
-if which less > /dev/null; then
-  export PAGER="$(which less)"
-  export MANPAGER="$(which less) -is"
-fi
-
-
 #------------------------------------------------------------------------------
 # fzf
 #------------------------------------------------------------------------------
