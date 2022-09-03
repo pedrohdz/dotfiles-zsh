@@ -147,23 +147,6 @@ function update_terminal_cwd()
   printf '\033]2;%s - %s\07' "${USER}@${HOST}" "$url_path"
 }
 
-function py-activate()
-{
-  # Is there a local virtualenv
-  local l_activate="$PWD/.venv/bin/activate"
-  if [ ! -e "$l_activate" ]; then
-    echo "ERROR - Could not find '$l_activate'"
-    return 1
-  fi
-
-  echo "Activating: $l_activate"
-  source "$l_activate"
-  if [ $? -ne 0 ]; then
-    echo "ERROR - Failed to exectute '$l_activate'"
-    return 1
-  fi
-}
-
 function _source_includes()
 {
   local _local_prefix
@@ -182,10 +165,11 @@ function _source_includes()
 
   local _includes
   _includes=( \
-    "$HOME/.p10k.zsh" \
-    "$HOME/.homesick/repos/homeshick/homeshick.sh" \
-    "$_local_prefix/share/fzf/shell/key-bindings.zsh" \
-    "$_local_prefix/share/zsh/site-functions/_fzf" \  # Broken, does not get loaded with $fpath, so sourcing directly
+    $HOME/.p10k.zsh \
+    $HOME/.local/etc/shell-common/common.d/*.sh \
+    $HOME/.homesick/repos/homeshick/homeshick.sh \
+    $_local_prefix/share/fzf/shell/key-bindings.zsh \
+    $_local_prefix/share/zsh/site-functions/_fzf \  # Broken, does not get loaded with $fpath, so sourcing directly
   )
 
   for _file in "${_includes[@]}"; do
