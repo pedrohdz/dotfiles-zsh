@@ -10,6 +10,7 @@ fi
 fpath=( \
   $HOME/.homesick/repos/homeshick/completions \
   $HOME/.local/share/zsh/site-functions \
+  /opt/devenv/share/zsh/site-functions \
   $fpath \
 )
 
