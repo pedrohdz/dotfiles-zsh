@@ -1,5 +1,9 @@
 # shellcheck shell=bash
 
+if [[ ! (-o interactive || $- == *i*) ]]; then
+  return 0
+fi
+
 function py-activate()
 {
   # Is there a local virtualenv

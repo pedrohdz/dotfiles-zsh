@@ -1,5 +1,9 @@
 # shellcheck shell=bash
 
+if [[ ! (-o interactive || $- == *i*) ]]; then
+  return 0
+fi
+
 if which nvim > /dev/null; then
   _editor=$(which nvim)
   export EDITOR="$_editor"

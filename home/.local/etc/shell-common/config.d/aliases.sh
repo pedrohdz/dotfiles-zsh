@@ -1,5 +1,9 @@
 # shellcheck shell=bash
 
+if [[ ! (-o interactive || $- == *i*) ]]; then
+  return 0
+fi
+
 if which dircolors > /dev/null; then
   eval "$(dircolors -b)"
   alias ls='ls --color=auto'
