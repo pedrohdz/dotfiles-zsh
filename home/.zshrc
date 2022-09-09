@@ -120,6 +120,7 @@ function _source_includes()
   _includes=( \
     $HOME/.p10k.zsh \
     $HOME/.local/etc/shell-common/common.d/*.sh \
+    $HOME/.local/etc/zsh/config.d/*.zsh \
     $HOME/.homesick/repos/homeshick/homeshick.sh \
     $_local_prefix/share/fzf/shell/key-bindings.zsh \
     $_local_prefix/share/zsh/site-functions/_fzf \  # Broken, does not get loaded with $fpath, so sourcing directly
