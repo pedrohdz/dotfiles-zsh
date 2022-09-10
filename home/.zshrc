@@ -25,6 +25,8 @@ antigen bundle zsh-users/zsh-autosuggestions
 
 # TODO:
 #  - https://github.com/Aloxaf/fzf-tab
+#  - sgpthomas/zsh-up-dir - Love the idea, does not work woth p10k. :-(  Look
+#    at https://github.com/romkatv/powerlevel10k/issues/72
 
 # Plugin fails:
 #  - jeffreytse/zsh-vi-mode - NEVER use again.  Messes with cursor
@@ -46,6 +48,7 @@ setopt bash_autolist
 setopt no_share_history
 unsetopt correct_all
 
+# This binds Up and Down arrow keys.
 bindkey '\e[A' history-beginning-search-backward
 bindkey '\e[B' history-beginning-search-forward
 
@@ -123,7 +126,7 @@ function _source_includes()
     $HOME/.local/etc/zsh/config.d/*.zsh \
     $HOME/.homesick/repos/homeshick/homeshick.sh \
     $_local_prefix/share/fzf/shell/key-bindings.zsh \
-    $_local_prefix/share/zsh/site-functions/_fzf \  # Broken, does not get loaded with $fpath, so sourcing directly
+    $_local_prefix/share/fzf/shell/completion.zsh \
   )
 
   for _file in "${_includes[@]}"; do
