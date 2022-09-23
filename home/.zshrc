@@ -15,6 +15,15 @@ fpath=( \
 )
 
 #------------------------------------------------------------------------------
+# Trying out McFly
+#------------------------------------------------------------------------------
+# eval "$(mcfly init zsh)"
+# export MCFLY_KEY_SCHEME=vim
+# export MCFLY_FUZZY=2
+# export MCFLY_RESULTS=50
+
+
+#------------------------------------------------------------------------------
 # Antigen
 #------------------------------------------------------------------------------
 source ~/.local/lib/zsh/antigen/antigen.zsh
@@ -22,6 +31,7 @@ source ~/.local/lib/zsh/antigen/antigen.zsh
 antigen theme romkatv/powerlevel10k
 antigen bundle vi-mode
 antigen bundle zsh-users/zsh-autosuggestions
+antigen bundle mfaerevaag/wd
 
 # TODO:
 #  - https://github.com/Aloxaf/fzf-tab
@@ -40,13 +50,15 @@ antigen apply
 # Configuration
 #------------------------------------------------------------------------------
 HISTFILE=~/.zsh_history
-HISTSIZE=5000
-SAVEHIST=2500
+HISTSIZE=10000
+SAVEHIST=10000
 #bindkey -v
+setopt hist_ignore_space
 
 setopt bash_autolist
 setopt no_share_history
 unsetopt correct_all
+setopt +o nomatch
 
 # This binds Up and Down arrow keys.
 bindkey '\e[A' history-beginning-search-backward

@@ -27,7 +27,8 @@ alias qsl="date +%Y%m%d_%H%M"
 alias pause='read -n 1 -s -r -p "Press any key to continue..."; echo'
 alias wget-continue='wget --tries=50 --continue --waitretry=2'
 
-alias cleanbackups='find . -name "*~" -exec rm -v \{\} \;'
+# cbackups = "Clean backups"
+alias cbackups='find . -name "*~" -exec rm -v \{\} \;'
 
 if which python > /dev/null; then
   alias jsonpp='python -m json.tool'
