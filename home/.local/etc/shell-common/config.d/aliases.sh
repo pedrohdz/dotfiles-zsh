@@ -27,11 +27,19 @@ alias qsl="date +%Y%m%d_%H%M"
 alias pause='read -n 1 -s -r -p "Press any key to continue..."; echo'
 alias wget-continue='wget --tries=50 --continue --waitretry=2'
 
-# cbackups = "Clean backups"
+# Cleanup commands
 alias cbackups='find . -name "*~" -exec rm -v \{\} \;'
+alias chomeshick='find ~/.local ~/.config ~/.vim ~/.tmux -xtype l -print -delete'
 
 if which python > /dev/null; then
   alias jsonpp='python -m json.tool'
 fi
+
+_ignore="$HOME/.config/fd/ignore"
+if which rg > /dev/null && [[ -e "$_ignore" ]]; then
+  # shellcheck disable=SC2139
+  alias rg="rg --ignore-file=$_ignore"
+fi
+unset _ignore
 
 # vim: filetype=bash

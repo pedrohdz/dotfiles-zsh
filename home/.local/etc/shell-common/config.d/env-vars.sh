@@ -22,6 +22,12 @@ if which less > /dev/null; then
   unset _pager
 fi
 
+_ripgreprc="$HOME/.config/rg/ripgreprc"
+if which rg > /dev/null && [[ -e "$_ripgreprc" ]]; then
+  export RIPGREP_CONFIG_PATH="$_ripgreprc"
+fi
+unset _ripgreprc
+
 export MYSQL_HOME=${HOME}/.mysql
 export P4CONFIG=.p4config
 export WATCH_INTERVAL=1
