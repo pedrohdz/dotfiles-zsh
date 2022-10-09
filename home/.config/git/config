@@ -1,0 +1,101 @@
+#------------------------------------------------------------------------------
+# User
+#------------------------------------------------------------------------------
+[user]
+  email = 5179251+pedrohdz@users.noreply.github.com
+  name = Pedro H
+  signingKey = 0xADB0821E62CC1EDD
+
+#------------------------------------------------------------------------------
+# Aliases
+#------------------------------------------------------------------------------
+[alias]
+  dt = difftool
+  fetch-prune = "!f() { local target=\"${1:-origin}\"; git fetch --prune --prune-tags \"$target\"; }; f"
+  files-changed-diff = show --pretty=\"\" --name-only --dirstat=lines
+  files-in-commit = show --pretty=\"\" --name-only
+  logg = log --graph --decorate=full --show-signature
+  mt = mergetool
+  prune = "!f() { local target=\"${1:-origin}\"; git fetch --prune \"$target\" && git prune-tags \"$target\"; }; f"
+  prune-tags = "!f() { git fetch --prune \"${1:-origin}\" \"+refs/tags/*:refs/tags/*\"; }; f"
+  pullff = pull --ff-only
+  slogg = slogg-long --max-count=10
+  slogg-long = log --abbrev-commit --date=relative --graph \
+      --pretty=format:'%Cred%h%Creset %C(blue bold)%G?%Creset -%C(yellow)%d%Creset %s %C(yellow dim)(%cr%Creset %C(yellow dim bold)%aN <%aE>%Creset%C(yellow dim))%Creset'
+
+#------------------------------------------------------------------------------
+# Common configuration options
+#------------------------------------------------------------------------------
+[color]
+  ui = auto
+  diff = auto
+  branch = auto
+  status = auto
+
+[init]
+  defaultBranch = main
+
+[core]
+  excludesfile = ~/.config/git/gitignore-global
+  pager = less $LESS --quit-if-one-screen
+
+#------------------------------------------------------------------------------
+# Command related configuration
+#------------------------------------------------------------------------------
+[commit]
+  gpgSign = true
+  template = ~/.config/git/git-commit-msg
+
+[tag]
+  gpgSign = true
+
+[branch]
+  autosetupmerge = true
+
+[push]
+  default = tracking
+
+[pull]
+  rebase = true
+
+[rebase]
+  stat = true
+
+#------------------------------------------------------------------------------
+# Diff tool
+#------------------------------------------------------------------------------
+[diff]
+  tool = neovimdiff
+
+[difftool "neovimdiff"]
+  cmd = nvim -d \"$LOCAL\" \"$REMOTE\" -c 'wincmd w' -c 'wincmd L'
+
+[difftool "sourcetree"]
+  cmd = opendiff \"$LOCAL\" \"$REMOTE\"
+  path = 
+
+#------------------------------------------------------------------------------
+# Merge tool
+#------------------------------------------------------------------------------
+[merge]
+  tool = neovimdiff
+
+[mergetool]
+  keepBackup = false
+
+[mergetool "neovimdiff"]
+  #cmd = nvim -d \"$LOCAL\" \"$REMOTE\" \"$MERGED\" -c '$wincmd w' -c 'wincmd J'
+  cmd = nvim -d \"$LOCAL\" \"$MERGED\" \"$BASE\" \"$REMOTE\" -c 'wincmd w' -c 'wincmd J'
+  trustExitCode = true
+
+#------------------------------------------------------------------------------
+# Other
+#------------------------------------------------------------------------------
+[github]
+  user = pedrohdz
+
+#------------------------------------------------------------------------------
+# Includes (contains overrides)
+#------------------------------------------------------------------------------
+[include]
+  path = ~/.config/git/config-local
