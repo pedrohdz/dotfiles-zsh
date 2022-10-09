@@ -14,7 +14,7 @@ if which dircolors > /dev/null; then
   alias fgrep='fgrep --color=auto'
   alias egrep='egrep --color=auto'
 
-  export LESS="-RX --use-color $LESS"
+  export LESS='--RAW-CONTROL-CHARS --no-init --use-color'
 fi
 
 alias ll='ls -lF'
