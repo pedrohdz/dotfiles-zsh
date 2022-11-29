@@ -1,0 +1,5 @@
+version='1'; created_on='Tue Nov 29 13:25:18 CET 2022'; checksum='957c2ac67c61965acc4474bfaeb20462';
+eaf39c0b8a0b3b99fa5f0904612f2230c5f20634 https://github.com/mfaerevaag/wd.git
+7dcabbe6826073ef6069c8a4b6f9a943f00d2df0 https://github.com/robbyrussell/oh-my-zsh.git
+957249a95c27c430aa55b55c0f4df9f5ced2bb39 https://github.com/romkatv/powerlevel10k.git
+a411ef3e0992d4839f0732ebeb9823024afaaaa8 https://github.com/zsh-users/zsh-autosuggestions.git
