@@ -68,7 +68,7 @@
   tool = neovimdiff
 
 [difftool "neovimdiff"]
-  cmd = nvim -d \"$LOCAL\" \"$REMOTE\" -c 'wincmd w' -c 'wincmd L'
+  cmd = nvim -Rd \"$LOCAL\" \"$REMOTE\" -c 'wincmd w' -c 'wincmd L'
 
 [difftool "sourcetree"]
   cmd = opendiff \"$LOCAL\" \"$REMOTE\"
@@ -85,7 +85,7 @@
 
 [mergetool "neovimdiff"]
   #cmd = nvim -d \"$LOCAL\" \"$REMOTE\" \"$MERGED\" -c '$wincmd w' -c 'wincmd J'
-  cmd = nvim -d \"$LOCAL\" \"$MERGED\" \"$BASE\" \"$REMOTE\" -c 'wincmd w' -c 'wincmd J'
+  cmd = nvim -Rd \"$LOCAL\" \"$MERGED\" \"$BASE\" \"$REMOTE\" -c 'wincmd w' -c 'wincmd J'
   trustExitCode = true
 
 #------------------------------------------------------------------------------
