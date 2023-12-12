@@ -5,7 +5,7 @@ if [[ ! (-o interactive || $- == *i*) ]]; then
 fi
 
 if which dircolors > /dev/null; then
-  eval "$(dircolors -b)"
+  eval "$(dircolors -b ~/.local/etc/shell-common/dircolors)"
   alias ls='ls --color=auto'
   alias dir='dir --color=auto'
   alias vdir='vdir --color=auto'
