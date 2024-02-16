@@ -16,8 +16,6 @@ bind-key -T copy-mode-vi y send-keys -X copy-pipe "pbcopy" \; \
 #------------------------------------------------------------------------------
 set -g mouse on
 
-bind-key -T copy-mode MouseDragEnd1Pane send-keys -X copy-pipe pbcopy
-bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe pbcopy
 
 #set -g default-terminal "screen-256color"
 

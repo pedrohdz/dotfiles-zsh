@@ -30,28 +30,8 @@ config.window_background_opacity = 0.85
 config.window_decorations = 'INTEGRATED_BUTTONS|RESIZE|MACOS_FORCE_ENABLE_SHADOW'
 
 
+local key_bindings = require 'pedrohdz.key_bindings'
+key_bindings.apply(config)
 
-config.keys = {
-  {
-    action = wezterm.action.ActivateTabRelativeNoWrap(-1),
-    key = 'LeftArrow',
-    mods = 'CMD|OPT',
-  },
-  {
-    action = wezterm.action.ActivateTabRelativeNoWrap(1),
-    key = 'RightArrow',
-    mods = 'CMD|OPT',
-  },
-  {
-    action = wezterm.action.MoveTabRelative(-1),
-    key = 'LeftArrow',
-    mods = 'SHIFT|CMD',
-  },
-  {
-    action = wezterm.action.MoveTabRelative(1),
-    key = 'RightArrow',
-    mods = 'SHIFT|CMD',
-  },
-}
 
 return config
