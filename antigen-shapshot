@@ -1,5 +1,5 @@
-version='1'; created_on='Thu Apr 20 13:15:27 CEST 2023'; checksum='b19b60a88fa66bd0af39060ebf06134e';
-31a626422568e1b9d46a514b25d3b130fe34f88c https://github.com/mfaerevaag/wd.git
-3fca9c8933afc5c118a73cedb171a3c7b8e92730 https://github.com/robbyrussell/oh-my-zsh.git
-33916e91a743a73472a15f3fc27dd0aa9f7abbdf https://github.com/romkatv/powerlevel10k.git
-a411ef3e0992d4839f0732ebeb9823024afaaaa8 https://github.com/zsh-users/zsh-autosuggestions.git
+version='1'; created_on='Sat Jun  8 14:53:27 CEST 2024'; checksum='c5cc86083ca26d7aae1af26bf3d33f7d';
+1975393268f3119b3984f6fe80512f5a95761440 https://github.com/mfaerevaag/wd.git
+8510847ff38a142850e4a065dc3cf09555260ff7 https://github.com/robbyrussell/oh-my-zsh.git
+bde5ca4c2aa6e0c52dd7f15cf216dffdb1ec788c https://github.com/romkatv/powerlevel10k.git
+c3d4e576c9c86eac62884bd47c01f6faed043fc5 https://github.com/zsh-users/zsh-autosuggestions.git

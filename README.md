@@ -6,9 +6,17 @@ This project is a combination of my old dotfiles:
 - [pedrohdz/dotfiles-powerline](https://github.com/pedrohdz/dotfiles-powerline)
 
 
+## Upgrade/update cheetsheet
+
+```shell
+antigen snapshot ~/.homesick/repos/dotfiles-zsh/antigen-shapshot
+antigen update
+```
+
+
 ## Setup
 
-```bash
+```shell
 git clone https://github.com/tmux-plugins/tpm "$XDG_CONFIG_HOME/tmux/plugins/tpm"
 ```
 
