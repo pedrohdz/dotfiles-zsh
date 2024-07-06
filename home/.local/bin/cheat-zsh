@@ -1,0 +1,14 @@
+#! /usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+XDG_DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}
+cheat_sheet_path=$XDG_DATA_HOME/pedrohdz/dotfiles-zsh/cheat-sheet.md
+
+glow \
+  --style dark \
+  --width 100 \
+  --pager \
+  "$cheat_sheet_path"
