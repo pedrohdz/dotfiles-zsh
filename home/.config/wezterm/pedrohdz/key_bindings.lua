@@ -11,6 +11,7 @@ function _M.apply(config)
     { key = 'l',          mods = 'CMD',       action = action.ShowDebugOverlay },
     { key = 'n',          mods = 'CMD',       action = action.SpawnWindow },
     { key = 'q',          mods = 'CMD',       action = action.QuitApplication },
+    { key = 'r',          mods = 'CMD',       action = action.ReloadConfiguration },
 
     -- Tabs
     { key = 'LeftArrow',  mods = 'CMD|OPT',   action = action.ActivateTabRelativeNoWrap(-1), },
