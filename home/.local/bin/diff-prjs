@@ -1,0 +1,10 @@
+#! /usr/bin/env bash
+
+set -o errexit
+set -o pipefail
+set -o nounset
+
+target_file=$1
+other_prj_dir=$2
+
+nvim -d "$other_prj_dir/$target_file" "$target_file"
