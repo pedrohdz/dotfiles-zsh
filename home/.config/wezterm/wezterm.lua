@@ -47,8 +47,8 @@ config.window_padding = {
 --   - https://wezfurlong.org/wezterm/config/lua/config/enable_csi_u_key_encoding.html
 config.enable_csi_u_key_encoding = true
 
-local key_bindings = require 'pedrohdz.key_bindings'
-key_bindings.apply(config)
+require('pedrohdz.key_bindings').apply(config)
+require('pedrohdz.mouse_bindings').apply(config)
 
 
 return config
