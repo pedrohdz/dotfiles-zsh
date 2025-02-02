@@ -7,12 +7,51 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
 fi
 
 
-fpath=( \
-  $HOME/.homesick/repos/homeshick/completions \
-  $HOME/.local/share/zsh/site-functions \
-  /opt/devenv/share/zsh/site-functions \
-  $fpath \
-)
+#------------------------------------------------------------------------------
+# Update fpath
+#------------------------------------------------------------------------------
+function
+{
+  local _port_prefix
+  if which port > /dev/null; then
+    _port_prefix=$(dirname "$(dirname "$(which port)")")
+  else
+    _port_prefix="/opt/local"
+  fi
+
+  local _paths=(
+    "$HOME/.homesick/repos/homeshick/completions"
+    "$HOME/.local/share/zsh/site-functions"
+    "/opt/devenv/share/zsh/site-functions"
+    "/opt/devenv/share/zsh/$ZSH_VERSION/functions"
+    "${_port_prefix:+$_port_prefix/share/zsh/site-functions}"
+    "${_port_prefix:+$_port_prefix/share/zsh/$ZSH_VERSION/functions}"
+    "/usr/local/share/zsh/site-functions"
+    "/usr/local/share/zsh/$ZSH_VERSION/functions"
+    "/usr/share/zsh/site-functions"
+    "/usr/share/zsh/$ZSH_VERSION/functions"
+  )
+
+  # Build the initial list
+  local _new_fpath=()
+  local _dir
+  for _dir in "${_paths[@]}"; do
+    if [[ -d "$_dir" ]]; then
+      _new_fpath+=("$_dir")
+    fi
+  done
+
+  # Append original fpath values if they are not already in _new_fpath.
+  for _dir in "${fpath[@]}"; do
+    if (( ! $_new_fpath[(Ie)$_dir] )) && [[ -d "$_dir" ]]; then
+      _new_fpath+=("$_dir")
+    fi
+  done
+
+  # Replace fpath
+  fpath=($_new_fpath)
+}
+
 
 #------------------------------------------------------------------------------
 # Trying out McFly
