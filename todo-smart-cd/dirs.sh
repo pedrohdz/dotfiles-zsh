@@ -57,58 +57,7 @@ function __pfh_load_color_variables()
 #----
 # Smarter "cd"
 #----
-function __pfh_dirs_list()
-{
-  builtin dirs -v
-}
-
 function __pfh_dirs_msg()
-{
-  local _header=$1
-  local _target=${dirstack[$2]}
-
-  local _magenta=${__pfh_txt_color['magenta']}
-  local _cyan=${__pfh_txt_color['cyan']}
-  local _nc=${__pfh_txt_attr['CLEAR']}
-
-  >&2 printf "${_magenta}%s:${_nc} ${_cyan}%s${_nc}\n" "$_header" "$_target"
-}
-
-function __pfh_log_error()
-{
-  local _msg=$*
-  local _RED=${__pfh_txt_color['RED']}
-  local _nc=${__pfh_txt_attr['CLEAR']}
-  >&2 printf "${_RED}ERROR - ${_nc}%s\n" "$_msg"
-}
-
-function __pfh_dirs_validate_dir()
-{
-  local _target=$1
-  if [[ ! -d "$_target" ]]; then
-    __pfh_log_error "Directory does not exist: $_target"
-    return 1
-  fi
-}
-
-function __pfh_dirs_rotate_back()
-{
-  local _index=$1
-  if [[ -z "$_index" ]]; then
-    _index=1
-  fi
-
-  local _target=${dirstack[$_index]}
-  if [[ ! -d "$_target" ]]; then
-    __pfh_log_error "Directory does not exist: $_target"
-    return 1
-  fi
-
-  __pfh_dirs_msg "Rotating back to" "$_index"
-  builtin pushd +"${_index}" > /dev/null || return 1
-}
-
-function __pfh_dirs_msg_new()
 {
   local _header=$1
   local _target=$2
@@ -127,34 +76,62 @@ function __pfh_dirs_get_dir()
   if [[ -d "$_target" ]]; then
     echo "$_target"
   elif [[ -z "$_target" ]]; then
-    __pfh_log_error "Index of '$_user_index' is invalid."
+    __pfh_logf_error "Index of '%s' is invalid." "$_user_index"
     echo ""
   else
-    __pfh_log_error "Directory does not exist: $_target"
+    __pfh_logf_error "Directory does not exist: %s" "$_target"
     echo ""
   fi
 }
 
+
+function __pfh_logf_error()
+{
+  local _msg=$1; shift
+  local _RED=${__pfh_txt_color['RED']}
+  local _nc=${__pfh_txt_attr['CLEAR']}
+  >&2 printf "${_RED}ERROR - ${_nc}${_msg}\n" "$@"
+}
+
+
 function __pfh_dirs_rotate_forward()
 {
-  local -i _user_index=${1:=1}
-  _user_index=${1:=1}
-
-  if [[ $_user_index < 1 ]] || [[ $_user_index > ${#dirstack[@]} ]]; then
-    echo  BANG
+  local -i _dirstack_size=${#dirstack[@]}
+  if [[ ! ${1:=0} =~ ^[+-]{0,1}[0-9]+$ ]]; then
+    __pfh_logf_error "Dirstack index of '%s' is invalid.  The index must be between '%d' and '%d'." \
+      "$1" $_dirstack_size $((-_dirstack_size))
+    return 1
   fi
 
+  local -i _user_index=${1:=0}
+  if [[ $_user_index -lt $((-_dirstack_size)) ]] \
+    || [[ $_user_index -gt $_dirstack_size ]]
+  then
+    __pfh_logf_error "Dirstack index of '%d' is out of range.  The index must be between '%d' and '%d'." \
+      $_user_index $_dirstack_size $((-_dirstack_size))
+    return 1
+  fi
 
-  local _reverse_index=$(( _user_index - 1 ))
-  local _real_index=$(( ${#dirstack[@]} - _reverse_index ))
+  local _real_index  # Must be string!
+  local _direction
+  if [[ $_user_index -eq 0 ]]; then
+    builtin dirs -v
+    return 0
+  elif [[ $_user_index -gt 0 ]]; then
+    _real_index="+$_user_index"
+    _direction='backward'
+  elif [[ $_user_index -lt 0 ]]; then
+    _real_index="-$(( _user_index + _dirstack_size + 1 ))"
+    _direction='forward'
+  fi
 
   local _target
   _target=$(__pfh_dirs_get_dir "$_user_index" "$_real_index")
   [[ -n "$_target" ]] \
     || return 1
 
-  __pfh_dirs_msg_new "Rotating forward to" "$_target"
-  # builtin pushd -${_index} > /dev/null \
+  __pfh_dirs_msg "Rotating $_direction to" "$_target"
+  # builtin pushd "${_real_index}" > /dev/null \
   #   || return 1
 }
 
@@ -165,9 +142,7 @@ __pfh_load_color_variables
 # alias cd='__pfh_dirs_cd'
 # alias ..='__pfh_dirs_cd ..'
 # alias -- -='__pfh_dirs_cd -'
-alias d='__pfh_dirs_list'
-alias b='__pfh_dirs_rotate_back'
-alias f='__pfh_dirs_rotate_forward'
+alias d='__pfh_dirs_rotate_forward'
 # alias r='__pfh_dirs_reverse'
 # alias x='__pfh_dirs_remove'
 
