@@ -154,6 +154,11 @@ function __phdz_dirring()
     _real_index="-$(( _user_index + _dirstack_size ))"
   fi
 
+  local _target
+  _target=$(__phdz_dirring_get_dir "$_user_index" $((_real_index - 1)))
+  [[ -n "$_target" ]] \
+    || return 1
+
   __phdz_dirring_cd "${_real_index}" \
     || return 1
 }
