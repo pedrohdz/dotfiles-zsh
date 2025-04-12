@@ -219,5 +219,5 @@ compinit
 # Stop processing at this point!
 return 0
 
-#autoload -U +X bashcompinit && bashcompinit
-#complete -o nospace -C /opt/devenv/bin/terraform terraform
+# autoload -U +X bashcompinit && bashcompinit
+# complete -o nospace -C terraform terraform
