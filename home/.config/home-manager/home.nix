@@ -34,6 +34,35 @@
     # (pkgs.writeShellScriptBin "my-hello" ''
     #   echo "Hello, ${config.home.username}!"
     # '')
+
+      pkgs.curl
+      pkgs.diceware
+      pkgs.exfatprogs
+      pkgs.f2fs-tools
+      pkgs.git
+      pkgs.gnupg
+      pkgs.haskellPackages.hopenpgp-tools
+      pkgs.jq
+      pkgs.kbd
+      pkgs.less
+      pkgs.neovim
+      pkgs.netcat-openbsd
+      pkgs.paperkey
+      pkgs.pwgen
+      pkgs.qrencode
+      pkgs.rng-tools
+      pkgs.scrypt
+      pkgs.tmux
+      pkgs.tree
+      pkgs.unzip
+      pkgs.vim
+      pkgs.wget
+      pkgs.xkcdpass
+      pkgs.yq
+      pkgs.yubikey-personalization
+      pkgs.zbar
+      pkgs.zip
+      pkgs.zsh
   ];
 
   # Home Manager is pretty good at managing dotfiles. The primary way to manage
