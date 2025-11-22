@@ -50,7 +50,7 @@
       pkgs.pwgen
       pkgs.qrencode
       pkgs.rng-tools
-      pkgs.ruby
+      # pkgs.ruby
       pkgs.scrypt
       pkgs.tmux
       pkgs.tree
@@ -63,6 +63,23 @@
       pkgs.zbar
       pkgs.zip
       pkgs.zsh
+
+      # NeoVim specific
+      # pkgs.ansible-language-server # TODO - No longer supported by Nix
+      pkgs.bash-language-server
+      pkgs.dockerfile-language-server-nodejs
+      pkgs.helm-ls
+      pkgs.lua-language-server
+      pkgs.nixd
+      pkgs.prettierd
+      pkgs.pyright
+      pkgs.rust-analyzer
+      pkgs.solargraph
+      pkgs.terraform-ls
+      pkgs.vim-language-server
+      pkgs.vscode-langservers-extracted
+      pkgs.yaml-language-server
+
   ];
 
   # Home Manager is pretty good at managing dotfiles. The primary way to manage
