@@ -37,8 +37,6 @@
 
       pkgs.curl
       pkgs.diceware
-      pkgs.exfatprogs
-      pkgs.f2fs-tools
       pkgs.git
       pkgs.gnupg
       pkgs.haskellPackages.hopenpgp-tools
@@ -47,10 +45,12 @@
       pkgs.less
       pkgs.neovim
       pkgs.netcat-openbsd
+      pkgs.nodejs
       pkgs.paperkey
       pkgs.pwgen
       pkgs.qrencode
       pkgs.rng-tools
+      pkgs.ruby
       pkgs.scrypt
       pkgs.tmux
       pkgs.tree
