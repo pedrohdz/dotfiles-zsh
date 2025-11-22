@@ -37,6 +37,7 @@
 
       pkgs.curl
       pkgs.diceware
+      pkgs.fzf
       pkgs.git
       pkgs.gnupg
       pkgs.haskellPackages.hopenpgp-tools
@@ -49,6 +50,7 @@
       pkgs.paperkey
       pkgs.pwgen
       pkgs.qrencode
+      pkgs.ripgrep
       pkgs.rng-tools
       # pkgs.ruby
       pkgs.scrypt
