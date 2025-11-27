@@ -17,7 +17,7 @@
 
   # The home.packages option allows you to install Nix packages into your
   # environment.
-  home.packages = [
+  home.packages = with pkgs; [
     # # Adds the 'hello' command to your environment. It prints a friendly
     # # "Hello, world!" when run.
     # pkgs.hello
@@ -35,52 +35,149 @@
     #   echo "Hello, ${config.home.username}!"
     # '')
 
-      pkgs.curl
-      pkgs.diceware
-      pkgs.fzf
-      pkgs.git
-      pkgs.gnupg
-      pkgs.haskellPackages.hopenpgp-tools
-      pkgs.jq
-      pkgs.kbd
-      pkgs.less
-      pkgs.neovim
-      pkgs.netcat-openbsd
-      pkgs.nodejs
-      pkgs.paperkey
-      pkgs.pwgen
-      pkgs.qrencode
-      pkgs.ripgrep
-      pkgs.rng-tools
-      # pkgs.ruby
-      pkgs.scrypt
-      pkgs.tmux
-      pkgs.tree
-      pkgs.unzip
-      pkgs.vim
-      pkgs.wget
-      pkgs.xkcdpass
-      pkgs.yq
-      pkgs.yubikey-personalization
-      pkgs.zbar
-      pkgs.zip
-      pkgs.zsh
+    # proxytunnel
+    # bcrypt
+    # cryptcat
+    # makepasswd
+    # netcat
+    # netcat-gnu
+    # flake8
 
-      # NeoVim specific
-      # pkgs.ansible-language-server # TODO - No longer supported by Nix
-      pkgs.bash-language-server
-      pkgs.dockerfile-language-server-nodejs
-      pkgs.helm-ls
-      pkgs.lua-language-server
-      pkgs.nixd
-      pkgs.prettierd
-      pkgs.pyright
-      pkgs.rust-analyzer
-      pkgs.solargraph
-      pkgs.terraform-ls
-      pkgs.vim-language-server
-      pkgs.vscode-langservers-extracted
-      pkgs.yaml-language-server
+    asciidoc
+    aspell
+    aspellDicts.en
+    aspellDicts.es
+    aspellDicts.sv
+    awscli2
+    bash
+    bash-completion
+    bat
+    bump2version
+    cmake
+    coreutils
+    curl
+    cvs
+    diceware
+    fd
+    findutils
+    fzf
+    gawk
+    git
+    git-secret
+    gnugrep
+    gnumake
+    gnupg
+    gnused
+    gnutar
+    graphviz
+    grepcidr
+    haskellPackages.argon2
+    haskellPackages.hopenpgp-tools
+    helm
+    htop
+    # ignr
+    imagemagick
+    inetutils
+    isort
+    jq
+    kbd
+    kubectl
+    kubectx
+    ldns
+    less
+    lftp
+    minicom
+    mtools
+    neovim
+    netcat-openbsd
+    nmap
+    nodejs
+    openssh
+    p7zip
+    pandoc
+    paperkey
+    proxychains-ng
+    pv
+    pwgen
+    python313Packages.flake8
+    python313Packages.netaddr
+    python313Packages.pipdeptree
+    python313Packages.pygments
+    python313Packages.pylint
+    python313Packages.sqlparse
+    python313Packages.tabulate
+    python313Packages.tox
+    python314Full
+    qrencode
+    ripgrep
+    rng-tools
+    scrypt
+    shellcheck
+    siege
+    silver-searcher
+    smbclient-ng
+    socat
+    ssh-audit
+    sshpass
+    stunnel
+    tenv
+    thc-secure-delete
+    time
+    tmux
+    tor
+    traceroute
+    tree
+    tsocks
+    universal-ctags
+    unrar
+    unzip
+    vim
+    watch
+    wget
+    xkcdpass
+    xmlstarlet
+    yamllint
+    yarn
+    yq
+    yubikey-manager
+    yubikey-personalization
+    zbar
+    zip
+    zsh
+    zsh-completions
+
+    # NeoVim specific
+    # ansible-language-server # TODO - No longer supported by Nix
+    bash-language-server
+    dockerfile-language-server-nodejs
+    helm-ls
+    lua-language-server
+    nixd
+    prettierd
+    pyright
+    rust-analyzer
+    solargraph
+    terraform-ls
+    vim-language-server
+    vscode-langservers-extracted
+    yaml-language-server
+
+    # ----
+    # TODO - Checking these tools out
+    # ----
+    btop
+    entr
+    eza
+    gdu
+    git-extras
+    glow
+    jid
+    lsd
+    ncdu
+    rclone
+    rmlint
+    thefuck
+    tldr
 
   ];
 
