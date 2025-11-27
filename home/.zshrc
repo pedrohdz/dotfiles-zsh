@@ -10,6 +10,7 @@ fi
 #------------------------------------------------------------------------------
 # Update fpath
 #------------------------------------------------------------------------------
+# TODO - Should we drop the lines with $ZSH_VERSION completely?
 function
 {
   local _port_prefix
@@ -19,24 +20,37 @@ function
     _port_prefix="/opt/local"
   fi
 
+  # Nix Profiles
+  _nix_profiles=("${(@Oa)${(s: :)NIX_PROFILES}}")  # Splits and reverses order
+  local _nix_profiles_fpaths=()
+  local _nix_profile
+  for _nix_profile in "${_nix_profiles[@]}"; do
+    _nix_profiles_fpaths+=(
+      "$_nix_profile/share/zsh/site-functions"
+      # "$_nix_profile/share/zsh/$ZSH_VERSION/functions"
+    )
+  done
+
+  # Paths
   local _paths=(
+    "${_nix_profiles_fpaths[@]}"
     "$HOME/.homesick/repos/homeshick/completions"
     "$HOME/.local/share/zsh/site-functions"
     "/opt/devenv/share/zsh/site-functions"
-    "/opt/devenv/share/zsh/$ZSH_VERSION/functions"
+    # "/opt/devenv/share/zsh/$ZSH_VERSION/functions"
     "${_port_prefix:+$_port_prefix/share/zsh/site-functions}"
-    "${_port_prefix:+$_port_prefix/share/zsh/$ZSH_VERSION/functions}"
+    # "${_port_prefix:+$_port_prefix/share/zsh/$ZSH_VERSION/functions}"
     "/usr/local/share/zsh/site-functions"
-    "/usr/local/share/zsh/$ZSH_VERSION/functions"
+    # "/usr/local/share/zsh/$ZSH_VERSION/functions"
     "/usr/share/zsh/site-functions"
-    "/usr/share/zsh/$ZSH_VERSION/functions"
+    # "/usr/share/zsh/$ZSH_VERSION/functions"
   )
 
   # Build the initial list
   local _new_fpath=()
   local _dir
   for _dir in "${_paths[@]}"; do
-    if [[ -d "$_dir" ]]; then
+    if [[ -n "$_dir" ]] && [[ -d "$_dir" ]]; then
       _new_fpath+=("$_dir")
     fi
   done
@@ -49,7 +63,7 @@ function
   done
 
   # Replace fpath
-  fpath=($_new_fpath)
+  fpath=("${_new_fpath[@]}")
 }
 
 
@@ -214,10 +228,8 @@ compinit
 
 
 #------------------------------------------------------------------------------
-# BS gaurd
+# BS gaurd - Anything after this was added by something else
 #------------------------------------------------------------------------------
 # Stop processing at this point!
 return 0
-
-# autoload -U +X bashcompinit && bashcompinit
-# complete -o nospace -C terraform terraform
+#------------------------------------------------------------------------------
