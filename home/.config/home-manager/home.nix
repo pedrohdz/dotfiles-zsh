@@ -96,6 +96,7 @@
     p7zip
     pandoc
     paperkey
+    pass
     proxychains-ng
     pv
     pwgen
@@ -145,6 +146,9 @@
     zip
     zsh
     zsh-completions
+
+    # LLMs
+    aider-chat-full
 
     # NeoVim specific
     # ansible-language-server # TODO - No longer supported by Nix
