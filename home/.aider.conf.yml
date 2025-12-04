@@ -1,0 +1,26 @@
+###############################################################################
+# Configuration options can be found at:
+#   - https://aider.chat/docs/config/aider_conf.html
+###############################################################################
+
+dark-mode: true
+
+
+#------------------------------------------------------------------------------
+# Git
+#------------------------------------------------------------------------------
+# TODO - Add when we upgrade Aider
+# ## Enable/disable the addition of files listed in .gitignore to Aider's editing scope.
+# add-gitignore-files: false
+
+
+#------------------------------------------------------------------------------
+# Other
+#------------------------------------------------------------------------------
+vim: true
+
+## Enable/disable multi-line input mode with Meta-Enter to submit (default: False)
+multiline: true
+
+## Enable/disable fancy input with history and completion (default: True)
+fancy-input: true
