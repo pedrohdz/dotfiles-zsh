@@ -168,41 +168,56 @@ function update_terminal_cwd()
   printf '\033]2;%s - %s\07' "${USER}@${HOST}" "$url_path"
 }
 
-function _source_includes()
-{
-  local _local_prefix
-  if which port > /dev/null; then
-    _local_prefix=$(dirname "$(dirname "$(which port)")")
-  else
-    _local_prefix='/usr/local'
-  fi
-
-  # local _brew_prefix
-  # if which brew > /dev/null; then
-  #   _brew_prefix=$(brew --prefix)
-  # else
-  #   _brew_prefix='/DOES/NOT/EXIST'
-  # fi
-
+# Source common includes
+function {
   local _includes
   _includes=( \
     $HOME/.p10k.zsh \
     $HOME/.local/etc/shell-common/config.d/*.sh \
     $HOME/.local/etc/zsh/config.d/*.zsh \
     $HOME/.homesick/repos/homeshick/homeshick.sh \
-    $_local_prefix/share/fzf/shell/key-bindings.zsh \
-    $_local_prefix/share/fzf/shell/completion.zsh \
   )
 
   for _file in "${_includes[@]}"; do
     if [[ -f $_file ]]; then
-      #echo "Processing: $_file"
+      # echo "Processing: $_file"
       source "$_file"
     fi
   done
 }
 
-_source_includes
+# Find and source fzf includes, order of precedence:
+#   - Nix profiles
+#   - MacPorts
+#   - /usr/local/share/
+#   - /usr/share/doc/ - Common for Ubuntu & Debian
+function {
+  local _fzf_shares=()
+
+  local _nix_profiles=("${(@Oa)${(s: :)NIX_PROFILES}}")  # Splits and reverses order
+  [[ $_nix_profiles ]] \
+    && _fzf_shares+=("${_nix_profiles[@]/%//share/fzf}")
+
+  local _port_path
+  if _port_path=$(command -v port 2>/dev/null); then
+    _fzf_shares+=("${_port_path:h:h}/share/fzf/shell")
+  fi
+
+  _fzf_shares+=(
+    '/usr/local/share/fzf/shell'
+    '/usr/share/doc/fzf/examples'
+  )
+
+  local _fzf_dir
+  for _fzf_dir in "${_fzf_shares[@]}"; do
+    if [[ -d $_fzf_dir ]]; then
+      source "$_fzf_dir/key-bindings.zsh"
+      source "$_fzf_dir/completion.zsh"
+      return
+    fi
+  done
+}
+
 add-zsh-hook chpwd update_terminal_cwd
 update_terminal_cwd
 
