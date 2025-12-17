@@ -62,6 +62,7 @@
     findutils
     fzf
     gawk
+    gh
     git
     git-secret
     gnugrep
@@ -149,6 +150,9 @@
 
     # LLMs
     aider-chat-full
+    codex
+    codex-acp
+
 
     # NeoVim specific
     # ansible-language-server # TODO - No longer supported by Nix
