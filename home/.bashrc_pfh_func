@@ -1,0 +1,436 @@
+#----
+# Terminal Window Title
+#----
+function __pfh_set_term_title ()
+{
+  local title="$term_title_base - $(__pfh_dirs_escape $*)"
+
+    # This would make Rumba hang, so only do for some TERMs:
+    if [ "$term_title_on" = "TRUE" ] ; then
+        printf '\033]2;'"$title"'\07'
+    fi
+}
+
+function __pfh_vim_set_term_title ()
+{
+    vim "$@"
+    __pfh_set_term_title $PWD
+}
+
+#----
+# Smarter "cd"
+#----
+function __pfh_dirs_cd ()
+{
+    local new_pwd="$*"
+
+    if [ -z "$new_pwd" ]; then
+        new_pwd="$HOME"
+    fi
+
+    builtin pushd "$new_pwd" > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        printf "${cl_RED}ERROR - Failed to change directory:${cl_NC} $(__pfh_dirs_escape ${new_pwd})\a\n"
+        return 1
+    fi
+
+    printf "${cl_magenta}Current working directory:${cl_NC} $(__pfh_dirs_escape ${PWD})${cl_NC}\n"
+    __pfh_set_term_title $PWD
+}
+
+function __pfh_dirs_remove ()
+{
+    local index=$1
+    if [ -z "$index" ]; then
+        index="1"
+    fi
+
+    local l_target=$(__pfh_dirs_escape ${DIRSTACK[$index]})
+    printf "${cl_magenta}Removing from DIRSTACK:${cl_NC} ${cl_cyan}${l_target}${cl_NC}\n"
+    builtin popd -n +$index > /dev/null
+    __pfh_dirs_list
+}
+
+function __pfh_dirs_reverse ()
+{
+    local index=$1
+    if [ -z "$index" ]; then
+        index="1"
+    fi
+
+    local l_target=$(__pfh_dirs_escape ${DIRSTACK[$index]})
+    printf "${cl_magenta}Reversing to:${cl_NC} ${cl_cyan}${l_target}${cl_NC}\n"
+    for (( c=1; c < $index; c++ )); do
+        builtin popd -n > /dev/null
+    done
+    builtin popd > /dev/null
+    __pfh_dirs_list
+}
+
+function __pfh_dirs_list ()
+{
+    builtin dirs -v
+}
+
+function __pfh_dirs_rotate_back ()
+{
+    local index=$1
+    if [ -z "$index" ]; then
+        index="1"
+    fi
+
+    local l_target=$(__pfh_dirs_escape ${DIRSTACK[$index]})
+    printf "${cl_magenta}Rotating back to:${cl_NC} ${cl_cyan}${l_target}${cl_NC}\n"
+    builtin pushd +${index} > /dev/null
+}
+
+function __pfh_dirs_rotate_forward ()
+{
+    local index=$1
+    if [ -z "$index" ]; then
+        index="1"
+    fi
+
+    let "index-=1"
+
+    local lookup_index=0
+    let "lookup_index=${#DIRSTACK[*]}-${index}-1"
+
+    local l_target=$(__pfh_dirs_escape ${DIRSTACK[$index]})
+    printf "${cl_magenta}Rotating forward to:${cl_NC} ${cl_cyan}${l_target}${cl_NC}\n"
+    builtin pushd -${index} > /dev/null
+}
+
+function __pfh_dirs_escape ()
+{
+    echo $1 | sed -e 's/%/%%/g'
+}
+
+#----
+# Cygwin related
+#----
+function __pfh_cygwin_command_alias ()
+{
+    # Asign parameters
+    local exec_type="$1"
+    local alias_name="$2"
+    local command="$3"
+
+    # Are we running in Cygwin
+    if [ "$OSTYPE" != "cygwin" ]; then
+        echo -e "${cl_RED}Not running Cygwin:${cl_NC} $alias_name ${cl_RED}->${cl_NC} ${command//\\/\\\\}"
+        return 1
+    fi
+
+
+    # Test and assign.
+    if /usr/bin/which "$alias_name"  > /dev/null 2>&1 ; then
+        echo -e "${cl_RED}Alias in use:${cl_NC} ${alias_name}"
+        return 1
+    elif [ ! -e "$command" ]; then
+        echo -e "${cl_RED}Command does not exist:${cl_NC} ${command//\\/\\\\}"
+        return 1
+    else
+        case "$exec_type" in
+            "cmd")
+                builtin alias $alias_name="/cygdrive/c/Windows/system32/cmd.exe  /C '$command'"
+                ;;
+
+            "plain")
+                local target_unix=$(/usr/bin/cygpath.exe -au "$command")
+                builtin alias $alias_name="'$target_unix'"
+                ;;
+
+            *)
+                echo -e "${cl_RED}Unknown execution type:${cl_NC} ${exec_type}"
+                return 1
+                ;;
+        esac
+        echo -e "${cl_BLUE}Mapped command:${cl_NC} $alias_name ${cl_CYAN}->${cl_NC} ${command//\\/\\\\}"
+    fi
+    return 0
+}
+
+#----
+# MySQL
+#----
+function __pfh_mysql_client ()
+{
+    local l_group="$1"; shift
+
+    local l_history_dir
+    if [ -n "$MYSQL_HOME" ]; then
+        l_history_dir="$MYSQL_HOME"
+    else
+        l_history_dir="${HOME}/.mysql"
+    fi
+
+    local l_history_file="${l_history_dir}/${l_group}.mysql_history"
+
+    if [ ! -d "$l_history_dir" ]; then
+        echo -e "${cl_RED}Creating directory:${cl_NC} ${l_history_dir}"
+        mkdir -v "$l_history_dir" || return 1
+        chmod -v 700 "$l_history_dir" || return 1
+        touch "${l_history_dir}/my.cnf" || return 1
+        chmod -v 600 "${l_history_dir}/my.cnf" || return 1
+    fi
+
+    echo -e "${cl_magenta}History file:${cl_NC} ${l_history_file}\n"
+    export MYSQL_HISTFILE="$l_history_file"
+    mysql --defaults-group-suffix="_$l_group" $@
+    local l_result=$?
+    export MYSQL_HISTFILE=
+
+    if [ -f "$l_history_file" ]; then
+        chmod 600 "$l_history_file"
+    fi
+
+    return $l_result
+}
+
+#----
+# Other
+#----
+function __pfh_searchfiles ()
+{
+    local grep_args="-H"
+    local break_loop
+    while [ -z "$break_loop" ] ; do
+        case "$1" in
+            -*)
+                grep_args="$grep_args $1"
+                shift
+                ;;
+            *)
+                break_loop=yes
+                ;;
+        esac
+    done
+
+    local string="$1"
+    local file_pattern="$2"
+
+    find . -name "$file_pattern" -exec grep $grep_args -e "$string" \{\} \;
+}
+
+# __pfh_find_broken_symlinks() is based on:
+#       http://scotgate.org/2007/03/04/howto-find-broken-symbolic-links-gentoo-linux-wiki/
+#
+function __pfh_find_broken_symlinks ()
+{
+    # TODO - Replace with one liner
+    local count=$#
+    if [ $count -lt 1 ]; then
+        __pfh_find_broken_symlinks .
+        return
+    fi
+
+    local line
+    local x
+    for (( x=0; x<count; x++ )); do
+        find $1 -type l | (while read line ; do test -e "$line" || ls -ld "$line"; done)
+        shift
+    done | sort -u
+}
+
+function __pfh_load_color_variables ()
+{
+    # `tput` is a requirement.
+    if ! which tput > /dev/null 2>&1; then
+      return
+    fi
+
+    # `perl` is requires for `__pfh_prompt_length()` to work.
+    if ! which perl > /dev/null 2>&1; then
+      return
+    fi
+
+    # Read up on:
+    #   - http://www.commandlinefu.com/commands/view/3584/remove-color-codes-special-characters-with-sed
+    #   - http://www.termsys.demon.co.uk/vtansi.htm#colors  (Historical)
+    if [[ $(tput -T$TERM colors) -ge 8 ]]; then
+        # Foreground coloring
+        cl_black=$(tput setaf 0)
+        cl_red=$(tput setaf 1)
+        cl_green=$(tput setaf 2)
+        cl_yellow=$(tput setaf 3)
+        cl_blue=$(tput setaf 4)
+        cl_magenta=$(tput setaf 5)
+        cl_cyan=$(tput setaf 6)
+        cl_white=$(tput setaf 7)
+
+        # General text attributes
+        ta_bold=$(tput bold)
+        ta_underline=$(tput smul)
+        ta_dim=$(tput dim)
+        ta_rev=$(tput rev)
+        ta_NC=$(tput sgr0)
+        cl_NC=$(tput sgr0)
+
+        # Bold foreground coloring
+        cl_BLACK=${ta_bold}${cl_black}
+        cl_RED=${ta_bold}${cl_red}
+        cl_GREEN=${ta_bold}${cl_green}
+        cl_YELLOW=${ta_bold}${cl_yellow}
+        cl_BLUE=${ta_bold}${cl_blue}
+        cl_MAGENTA=${ta_bold}${cl_magenta}
+        cl_CYAN=${ta_bold}${cl_cyan}
+        cl_WHITE=${ta_bold}${cl_white}
+    fi
+}
+
+function __pfh_show_colors ()
+{
+    local l_color_var
+    for l_color_var in ${!cl_*}; do
+        echo -e ${!l_color_var}${l_color_var}${cl_NC}
+    done
+}
+
+#------------------------------------------------------------------------------
+# Prompt stuff-n-things
+#------------------------------------------------------------------------------
+function __pfh_pc_login
+{
+    echo "\\[${cl_yellow}\\]$@\\[${cl_NC}\\]"
+}
+
+function __pfh_pc_pwd
+{
+    echo "\\[${cl_magenta}\\]$@\\[${cl_NC}\\]"
+}
+
+function __pfh_pc_mute
+{
+    echo "\\[${cl_BLUE}\\]$@\\[${cl_NC}\\]"
+}
+
+function __pfh_pc_warn
+{
+    echo "\\[${cl_RED}\\]$@\\[${cl_NC}\\]"
+}
+
+function __pfh_pc_ok
+{
+    echo "\\[${cl_GREEN}\\]$@\\[${cl_NC}\\]"
+}
+
+function __pfh_pc_virtualenv
+{
+    echo "\\[${cl_WHITE}\\]$@\\[${cl_NC}\\]"
+}
+
+function __pfh_prompt_length
+{
+    if which perl > /dev/null 2>&1; then
+        echo $(echo $@ | perl -pe 's/\\\[.*?\\\]//g; s/\n$//' | wc -m)
+    else
+        echo $@ | wc -m
+    fi
+}
+
+function __pfh_collapse_home_dir ()
+{
+    local l_path=$@
+    local l_trimmed="${l_path#$HOME}"
+
+    if [ ${#l_trimmed} -lt ${#l_path} ]; then
+        l_trimmed="~${l_trimmed}"
+    fi
+
+    echo "$l_trimmed"
+}
+
+function __pfh_git_ps1 ()
+{
+    builtin type __git_ps1 > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        GIT_PS1_SHOWDIRTYSTATE="true"
+        GIT_PS1_SHOWUNTRACKEDFILES="true"
+        GIT_PS1_SHOWSTASHSTATE="true"
+        GIT_PS1_SHOWUPSTREAM="verbose"
+        GIT_PS1_DESCRIBE_STYLE="contains"
+
+        local l_git_ps1="$(__git_ps1 '[%s]')"
+        l_git_ps1="${l_git_ps1//\*/!}"
+        echo "$l_git_ps1"
+    fi
+}
+
+function __pfh_py_virtualenv ()
+{
+  if [ -n "$VIRTUAL_ENV" ]; then
+    basename "$(dirname "$VIRTUAL_ENV")"
+  fi
+}
+
+__pfh_prompt_center_line=$(printf '─%.0s' {1..500})
+
+function __pfh_prompt_command
+{
+    #----
+    # Gather information
+    # WARNING: "$?" MUST be first!!!
+    local l_rc="$?"
+    local l_cols="$COLUMNS"
+    local l_hostname="$HOSTNAME"
+    local l_time="$(date '+%b %d %H:%M')"
+    local l_pwd="$(__pfh_collapse_home_dir $PWD)"
+    local l_git_info="$(__pfh_git_ps1)"
+    local l_py_virtualenv="$(__pfh_py_virtualenv)"
+
+    #----
+    # Assemble base sections
+    local l_last_status
+    [ $l_rc -eq 0 ] && l_last_status=$(__pfh_pc_ok "✓") \
+        || l_last_status=$(__pfh_pc_warn "✘")
+
+    local l_head_base="$(__pfh_pc_mute ┌─)${l_last_status}"
+    local l_tail_base="${l_git_info}─${l_time}"
+    if [ -n "$l_py_virtualenv" ]; then
+        l_tail_base="(${l_py_virtualenv})${l_tail_base}"
+    fi
+
+    #----
+    # Shorten if needed
+    local l_base_data_length=$(__pfh_prompt_length "${l_head_base}${l_tail_base}")
+    local l_data_length
+    let "l_data_length = l_base_data_length + ${#l_hostname} + ${#l_pwd} + ${#USER} + 2"
+
+    if [ $l_data_length -ge $l_cols ]; then
+        # Prompt too long, try and shorten it
+        l_hostname=${l_hostname%%.*}
+        l_pwd=$(basename "$l_pwd")
+
+        # Check if the prompt is still too long
+        let "l_data_length = l_base_data_length + ${#l_hostname} + ${#l_pwd} + ${#USER} + 2"
+        if [ $l_data_length -ge $l_cols ]; then
+            # Still too long, return something very simple, and return
+            PS1="$(__pfh_pc_login \\u@\\h)$(__pfh_pc_mute :)$(__pfh_pc_pwd \\W)$(__pfh_pc_mute \\$) "
+            return
+        fi
+    fi
+
+    #----
+    # Assemble head & tail
+    local l_head="${l_head_base}$(__pfh_pc_mute ─)$(__pfh_pc_login ${USER}@${l_hostname})$(__pfh_pc_mute :)$(__pfh_pc_pwd $l_pwd)"
+    local l_tail="${l_tail_base}"
+
+    #----
+    # Assemble center
+    local l_head_and_tail_length=$(__pfh_prompt_length "${l_head}${l_tail}")
+    local l_center_length
+    let 'l_center_length = l_cols - l_head_and_tail_length'
+    local l_center=${__pfh_prompt_center_line:0:$l_center_length}
+
+    #----
+    # Assemble the second tail
+    local l_tail2="\\n$(__pfh_pc_mute └─\\!─\\$) "
+
+    #----
+    # Assemble everything together
+    PS1="\\n${l_head}$(__pfh_pc_mute $l_center${l_tail})${l_tail2}"
+}
+
+
+__PFH_BASHRC_LOADED='TRUE'

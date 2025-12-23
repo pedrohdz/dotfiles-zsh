@@ -1,0 +1,3 @@
+[submodule "ext/git-submodule-tools"]
+	path = ext/git-submodule-tools
+	url = https://github.com/kollerma/git-submodule-tools.git
