@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-
-export HTTP_PROXY='localhost:8123'
-export HTTPS_PROXY='localhost:8123'
-export FTP_PROXY='localhost:8123'
-export RSYNC_PROXY='localhost:8123'
-
