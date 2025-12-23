@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+tmux_config="$HOME/.tmux/dr-tunnels.conf"
+session_name='dr-tunnels'
+target_directory="$HOME"
+
+tmux 'attach-session' -t "$session_name" > /dev/null 2>&1 \
+        || tmux \
+                'new-session' -s "$session_name" -c "$target_directory" \; \
+                'source-file' "$tmux_config"

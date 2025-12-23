@@ -1,0 +1,93 @@
+#! /usr/bin/env bash
+
+set -o errexit
+set -o pipefail
+set -o nounset
+
+
+function prune_contexts {
+  local l_prune_contexts
+  l_prune_contexts=($(kubectl config get-contexts --output=name | $1 || true))
+
+  for l_context in "${l_prune_contexts[@]}"; do
+    echo "Deleting context: $l_context"
+    kubectl config delete-context "$l_context"
+  done
+}
+
+function prune_clusters {
+  local l_prune_clusters
+  l_prune_clusters=($(kubectl config get-clusters \
+    | tail -n +2 \
+    | $1 \
+    || true))
+
+  local l_cluster
+  for l_cluster in "${l_prune_clusters[@]}"; do
+    echo "Deleting cluster: $l_cluster"
+    kubectl config delete-cluster "$l_cluster"
+  done
+}
+
+function prune_users {
+  local l_prune_users
+  l_prune_users=($(kubectl config view --output=json \
+    | jp -u 'users[*].name' \
+    | grep -v '\(\[\|\]\)' \
+    | sed -e 's/^\s\+//' -e 's/,$//' -e 's/"//g' \
+    | $1 \
+    || true))
+
+  local l_user
+  for l_user in "${l_prune_users[@]}"; do
+    echo "Deleting user: $l_user"
+    kubectl config unset "users.$l_user"
+  done
+}
+
+function get_filter {
+  if [ "$1" == 'true' ]; then
+    echo 'cat'
+  else
+    local l_current_context
+    l_current_context=$(kubectl config current-context)
+    if [ -z "$l_current_context" ]; then
+      echo "ERROR - Current context must be set."
+      exit 1
+    fi
+    echo "grep -v $l_current_context"
+  fi
+}
+
+usage() {
+  local l_command
+  l_command=$(basename "$0")
+  echo "Usage:"
+  echo "  $l_command [--help|-h]"
+  echo "  $l_command [--all|-a]"
+  exit 0
+}
+
+
+#------------------------------------------------------------------------------
+# main()
+#------------------------------------------------------------------------------
+opts=$(getopt --options ah --long all,help -- "$@")
+eval set -- "$opts"
+remove_all=''
+while true; do
+  case "$1" in
+    -a | --all) remove_all='true'; shift ;;
+    -h | --help) usage ;;
+    -- ) shift; break ;;
+    * )
+      echo "ERROR = Unknown argument: '$1'"
+      exit 1
+      ;;
+  esac
+done
+
+filter=$(get_filter "$remove_all")
+prune_contexts "$filter"
+prune_clusters "$filter"
+prune_users "$filter"

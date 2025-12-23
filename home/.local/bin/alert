@@ -1,0 +1,15 @@
+#! /usr/bin/env bash
+
+set -o errexit
+set -o pipefail
+set -o nounset
+
+TITLE='Terminal command completed'
+MESSAGE='Terminal command completed'
+
+echo -en '\a'
+if which -s osascript; then
+  osascript \
+    -e "display notification \"$MESSAGE\" with title \"$TITLE\""
+fi
+echo 'Notifications sent'

@@ -1,0 +1,7 @@
+#!/opt/local/bin/bash
+
+export CATALINA_HOME=$HOME/dev/svr/tomcat7
+export CATALINA_BASE=$HOME/dev/svr/tomcat7-data
+
+
+$CATALINA_HOME/bin/catalina.sh $@

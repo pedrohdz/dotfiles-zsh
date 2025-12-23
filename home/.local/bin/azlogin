@@ -1,0 +1,32 @@
+#! /usr/bin/env bash
+
+set -o errexit
+set -o pipefail
+set -o nounset
+
+#----
+# Get current account
+_current_sub=$(az account list --query '[?isDefault].[name,id][0]' \
+    -o json 2> /dev/null )
+
+current_sub_name=$(echo "$_current_sub" | jp -u '[0]' 2> /dev/null || echo "")
+current_sub_id=$(echo "$_current_sub" | jp -u '[1]' 2> /dev/null || echo "")
+
+echo -n "Current subscription: "
+if [ -n "$current_sub_id" ]; then
+  echo "$current_sub_name ($current_sub_id)"
+else
+  echo "Not set"
+fi
+
+#----
+# Login
+az account clear
+az login --output table
+
+#----
+# Change subscription
+if [ -n "$current_sub_id" ]; then
+  az account set --output table --subscription "$current_sub_id"
+  echo -e "\nSubscription set to: $current_sub_name ($current_sub_id)"
+fi
