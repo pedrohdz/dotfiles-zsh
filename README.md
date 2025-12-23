@@ -4,6 +4,7 @@ This project is a combination of my old dotfiles:
 
 - [pedrohdz/dotfiles-tmux](https://github.com/pedrohdz/dotfiles-tmux)
 - [pedrohdz/dotfiles-powerline](https://github.com/pedrohdz/dotfiles-powerline)
+- [pedrohdz/dr-home](https://github.com/pedrohdz/dr-home)
 
 
 ## Upgrade/update cheetsheet
