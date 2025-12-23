@@ -114,7 +114,6 @@
     ripgrep
     rng-tools
     scrypt
-    shellcheck
     siege
     silver-searcher
     smbclient-ng
@@ -153,6 +152,9 @@
     codex
     codex-acp
 
+    # Linters & code analysis
+    gitleaks
+    shellcheck
 
     # NeoVim specific
     # ansible-language-server # TODO - No longer supported by Nix
