@@ -1,0 +1,104 @@
+#! /bin/bash
+set -o errexit
+set -o pipefail
+set -o nounset
+
+
+#------------------------------------------------------------------------------
+# Functions
+#------------------------------------------------------------------------------
+declare -a _tmux_cmds
+_tmux_cmds=()
+function push_tmux_cmd() {
+  if [[ -n "${_tmux_cmds:-}" && ${#_tmux_cmds} -gt 0 ]]; then
+    _tmux_cmds+=(";")
+  fi
+  _tmux_cmds+=("$@")
+}
+
+declare -a _tmux_exec
+function push_tmux_exec() {
+  _tmux_exec+=("$@")
+}
+
+function tmux_cmd() {
+  local l_new_session=$1
+  local l_new_session_name=$2
+  push_tmux_exec tmux
+  sessions=$( (tmux list-sessions 2> /dev/null | wc -l) || true)
+  if [[ "$l_new_session" == 'TRUE' || $sessions -eq 0 ]]; then
+    push_tmux_cmd 'new-session'
+    if [[ -n "$l_new_session_name" ]]; then
+      push_tmux_cmd 'rename-session' "$l_new_session_name"
+    fi
+  elif [[ $sessions -eq 1 ]]; then
+    push_tmux_cmd 'attach-session'
+  elif [[ $sessions -gt 1 ]]; then
+    push_tmux_cmd 'attach-session'
+    push_tmux_cmd 'choose-session' "switch-client -t '%%'"
+  else
+    (>&2 echo "ERROR - Unknown number of tmux sessions.")
+    exit 1
+  fi
+}
+
+function display_help() {
+  # TODO - Add a little more detail.
+  cat <<EOT
+Usage: $1 [-h] [-v] [-n[SESSION_NAME]]
+EOT
+}
+
+
+#------------------------------------------------------------------------------
+# Parse command line arguments
+#------------------------------------------------------------------------------
+_command_name=$(basename "$0")
+_args_temp=$(getopt --name "$_command_name" --options 'vn::h' -- "$@")
+eval set -- "$_args_temp"
+
+_new_session="FALSE"
+_new_session_name=""
+_verbose="FALSE"
+while true ; do
+  case "$1" in
+    -n|--new-session)
+      _new_session="TRUE"
+      _new_session_name="$2"
+      shift; shift
+      ;;
+    -v|--verbose)
+      _verbose="TRUE"
+      shift
+      ;;
+    -h|--help)
+      display_help "$_command_name"
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      (>&2 echo "ERROR - Internal error parsing command line arguments.")
+      exit 1
+  esac
+done
+
+
+#------------------------------------------------------------------------------
+# Process
+#------------------------------------------------------------------------------
+tmux_cmd "$_new_session" "$_new_session_name"
+
+#------------------------------------------------------------------------------
+# Execute
+#------------------------------------------------------------------------------
+if [[ "$_verbose" == 'TRUE' ]]; then
+  echo "DEBUG - Command expanded:"
+  for x in "${_tmux_exec[@]}" "${_tmux_cmds[@]}"; do
+    echo "  - $x"
+  done
+fi
+
+exec "${_tmux_exec[@]}" "${_tmux_cmds[@]}"

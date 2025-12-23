@@ -1,0 +1,134 @@
+#! /usr/bin/env bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+
+#------------------------------------------------------------------------------
+# Core functions
+#------------------------------------------------------------------------------
+main()
+{
+  verify_yk_connected
+  reload_gpg
+  swap_ssh_keys
+}
+
+verify_yk_connected()
+{
+  local _count
+  _count=$(ykman list | wc -l)
+  if [[ $_count -le 0 ]]; then
+    fatal "No YubiKey found."
+  elif [[ $_count -gt 1 ]]; then
+    fatal "Only one YubiKey can be connected at a time."
+  fi
+}
+
+reload_gpg()
+{
+  local _result
+  _result=$(gpg-connect-agent "scd serialno" "learn --force" "/bye")
+  if echo "$_result" | grep '^ERR' > /dev/null; then
+    fatal "Failed to reload GnuPG, output:" 0
+    echo "$_result"
+    exit 1
+  fi
+  log_info "Reloaded GnuPG..."
+}
+
+swap_ssh_keys()
+{
+  local _short_name _new_target _symlink
+  _symlink="$HOME/.ssh/id_ed25519_sk"
+  _short_name="$(device_short_name)"
+  _new_target=$(get_ssh_key_path "$_short_name")
+
+  if [ "$_new_target" == "$(readlink -f "$_symlink")" ] \
+      && [ "$_new_target.pub" == "$(readlink -f "$_symlink.pub")" ]; then
+    log_warn "SSH key symlinks already set, skipping."
+    return
+  fi
+
+  remove_ssh_identity "$_symlink"
+  local _new_target_base
+  _new_target_base=$(basename "$_new_target")
+  ln -sf "$_new_target_base" "$_symlink"
+  ln -sf "$_new_target_base.pub" "$_symlink.pub"
+  log_info "SSH key symlinks updated."
+}
+
+device_short_name()
+{
+  local _name _short_name
+  _name=$(ykman info)
+  _short_name=$(echo "$_name" \
+    | awk -F ': ' '/Device type/{ print $2 }' \
+    | sed -e 's/\s\+//g' -e 's/.*/\L&/g')
+
+  if [[ -z "$_short_name" ]]; then
+    fatal "Unable to parse YubiKey name."
+  fi
+
+  echo "$_short_name"
+}
+
+get_ssh_key_path() {
+  local _name
+  _name="$HOME/.ssh/id_ed25519_sk_$1"
+  if [ ! -f "$_name" ] || [ ! -f "$_name.pub" ]; then
+    fatal "SSH key file does not exist for '$_name'."
+  fi
+  echo "$_name"
+}
+
+remove_ssh_identity()
+{
+  if ssh-add -d "$1" > /dev/null 2>&1; then
+    log_warn "SSH key removed from agent."
+  fi
+}
+
+
+#------------------------------------------------------------------------------
+# Helpers
+#------------------------------------------------------------------------------
+if [[ $(tput colors) -ge 16 ]]; then
+  ta_bold=$(tput bold)
+  cl_GREEN=${ta_bold}$(tput setaf 2)
+  cl_NC=$(tput sgr0)
+  cl_RED=${ta_bold}$(tput setaf 1)
+  cl_yellow=$(tput setaf 3)
+else
+  ta_bold=''
+  cl_GREEN=''
+  cl_NC=''
+  cl_RED=''
+  cl_yellow=''
+fi
+
+fatal()
+{
+  printf "${cl_RED}FATAL - %s${cl_NC}\n" "$1" >&2
+  local _exit_code=${2-1}
+  if [[ $_exit_code -ne 0 ]];then
+    exit "$_exit_code"
+  fi
+}
+
+log_info()
+{
+  printf "${cl_GREEN}%s${cl_NC}\n" "$1"
+}
+
+log_warn()
+{
+  printf "${cl_yellow}%s${cl_NC}\n" "$1"
+}
+
+
+#------------------------------------------------------------------------------
+# Run!
+#------------------------------------------------------------------------------
+main
