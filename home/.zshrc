@@ -143,31 +143,6 @@ fi
 #------------------------------------------------------------------------------
 # Functions
 #------------------------------------------------------------------------------
-# Thank you: https://github.com/scriptingosx/dotfiles/blob/master/zshfunctions/update_terminal_pwd
-function update_terminal_cwd()
-{
-  # Percent-encode the pathname.
-  local url_path=''
-  {
-    # Use LC_CTYPE=C to process text byte-by-byte. Ensure that
-    # LC_ALL isn't set, so it doesn't interfere.
-    local i ch hexch LC_CTYPE=C LC_ALL=
-    for (( i = 1; i <= ${#PWD}; ++i)); do
-      ch="$PWD[i]"
-      if [[ "$ch" =~ [/._~A-Za-z0-9-] ]]; then
-        url_path+="$ch"
-      else
-        printf -v hexch "%02X" "'$ch"
-        # printf treats values greater than 127 as
-        # negative and pads with "FF", so truncate.
-        url_path+="%${hexch: -2:2}"
-      fi
-    done
-  }
-
-  printf '\033]2;%s - %s\07' "${USER}@${HOST}" "$url_path"
-}
-
 # Source common includes
 function {
   local _includes
@@ -217,9 +192,6 @@ function {
     fi
   done
 }
-
-add-zsh-hook chpwd update_terminal_cwd
-update_terminal_cwd
 
 
 #==============================================================================
