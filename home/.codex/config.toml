@@ -1,0 +1,115 @@
+#------------------------------------------------------------------------------
+# Core defaults (QUALITY-FIRST)
+#------------------------------------------------------------------------------
+model = "gpt-5.1-codex"
+model_provider = "openai"
+model_reasoning_effort = "high"
+model_reasoning_summary = "auto"
+model_verbosity = "medium"
+
+
+#------------------------------------------------------------------------------
+# Safety & control
+#------------------------------------------------------------------------------
+# Ask only when risky
+approval_policy = "on-request"
+
+# Read-only by default
+sandbox_mode = "read-only"
+
+
+#------------------------------------------------------------------------------
+# Features
+#------------------------------------------------------------------------------
+[features]
+parallel = true
+shell_tool = true
+shell_snapshot = true
+skills = true
+warnings = true
+web_search_request = false
+
+
+#------------------------------------------------------------------------------
+# Shell environment hygiene
+#------------------------------------------------------------------------------
+[shell_environment_policy]
+inherit = "core"
+ignore_default_excludes = true
+
+include_only = [
+  "PATH",
+  "HOME",
+  "LANG",
+  "LC_ALL",
+  "TERM",
+  "TMPDIR",
+  "SHELL",
+  "EDITOR",
+  "VISUAL",
+  "SSH_AUTH_SOCK",
+]
+
+exclude = [
+  "ARM_*",
+  "AWS_*",
+  "AZURE_*",
+  "CI",
+  "GCP_*",
+  "GITHUB_*",
+  "GOOGLE_*",
+  "OPENAI_*",
+  "TF_*",
+]
+
+
+#------------------------------------------------------------------------------
+# History
+#------------------------------------------------------------------------------
+[history]
+persistence = "save-all"
+
+
+#------------------------------------------------------------------------------
+# Profiles (CLI only — NOT used by CodeCompanion)
+#------------------------------------------------------------------------------
+[sandbox_workspace_write]
+writable_roots = []
+network_access = false
+
+
+#------------------------------------------------------------------------------
+# Profiles (CLI only — NOT used by CodeCompanion)
+#------------------------------------------------------------------------------
+# Fast Q&A, quick explanations
+[profiles.fast]
+model = "gpt-5.1-codex-mini"
+model_reasoning_effort = "low"
+model_verbosity = "low"
+approval_policy = "on-request"
+sandbox_mode = "read-only"
+
+# Deep refactors, long reasoning, large diffs
+[profiles.deep]
+model = "gpt-5.1-codex-max"
+model_reasoning_effort = "high"
+model_verbosity = "medium"
+approval_policy = "on-request"
+sandbox_mode = "read-only"
+
+# Deep refactors, long reasoning, large diffs, short responses
+[profiles.deep-terse]
+model = "gpt-5.1-codex-max"
+model_reasoning_effort = "high"
+model_verbosity = "low"
+approval_policy = "on-request"
+sandbox_mode = "read-only"
+
+# Explicit write-enabled mode (opt-in)
+[profiles.write]
+model = "gpt-5.1-codex"
+model_reasoning_effort = "high"
+model_verbosity = "medium"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
