@@ -119,28 +119,6 @@ bindkey '\e[B' history-beginning-search-forward
 
 
 #------------------------------------------------------------------------------
-# fzf
-#------------------------------------------------------------------------------
-if which fzf > /dev/null; then
-  export FZF_DEFAULT_OPTS='--height 40%'
-  export FZF_COMPLETION_OPTS='--height 40% --reverse --info=inline'
-  export FZF_CTRL_T_OPTS=$FZF_COMPLETION_OPTS
-  export FZF_CTRL_R_OPTS=$FZF_COMPLETION_OPTS
-  if which fd > /dev/null; then
-    export FZF_DEFAULT_COMMAND='command fd --hidden --follow --exclude .git'
-
-    _fzf_compgen_path() {
-      command fd --hidden --follow --exclude '.git' . "$1"
-    }
-
-    _fzf_compgen_dir() {
-      command fd --type d --hidden --follow --exclude '.git' . "$1"
-    }
-  fi
-fi
-
-
-#------------------------------------------------------------------------------
 # Functions
 #------------------------------------------------------------------------------
 # Source common includes
@@ -157,38 +135,6 @@ function {
     if [[ -f $_file ]]; then
       # echo "Processing: $_file"
       source "$_file"
-    fi
-  done
-}
-
-# Find and source fzf includes, order of precedence:
-#   - Nix profiles
-#   - MacPorts
-#   - /usr/local/share/
-#   - /usr/share/doc/ - Common for Ubuntu & Debian
-function {
-  local _fzf_shares=()
-
-  local _nix_profiles=("${(@Oa)${(s: :)NIX_PROFILES}}")  # Splits and reverses order
-  [[ $_nix_profiles ]] \
-    && _fzf_shares+=("${_nix_profiles[@]/%//share/fzf}")
-
-  local _port_path
-  if _port_path=$(command -v port 2>/dev/null); then
-    _fzf_shares+=("${_port_path:h:h}/share/fzf/shell")
-  fi
-
-  _fzf_shares+=(
-    '/usr/local/share/fzf/shell'
-    '/usr/share/doc/fzf/examples'
-  )
-
-  local _fzf_dir
-  for _fzf_dir in "${_fzf_shares[@]}"; do
-    if [[ -d $_fzf_dir ]]; then
-      source "$_fzf_dir/key-bindings.zsh"
-      source "$_fzf_dir/completion.zsh"
-      return
     fi
   done
 }

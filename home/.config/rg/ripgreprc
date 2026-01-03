@@ -1,4 +1,6 @@
 --follow
 --hidden
+--glob
+!.git/**
 
 # vim: filetype=conf
