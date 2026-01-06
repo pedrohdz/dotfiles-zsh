@@ -98,6 +98,8 @@
     pandoc
     paperkey
     pass
+    podman
+    podman-tui
     proxychains-ng
     pv
     pwgen
@@ -153,11 +155,20 @@
     codex-acp
 
     # Linters & code analysis
+    ansible-lint
     gitleaks
+    lua51Packages.luacheck
     shellcheck
+    yamllint
 
+    # ----
     # NeoVim specific
-    # ansible-language-server # TODO - No longer supported by Nix
+    # ----
+    # NeoVim/Lazy - Lua
+    lua51Packages.lua
+    lua51Packages.luarocks
+
+    # LSPs
     bash-language-server
     dockerfile-language-server-nodejs
     helm-ls
