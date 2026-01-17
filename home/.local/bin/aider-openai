@@ -4,11 +4,9 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-LLM_MODEL=o3-mini
-
 printf "\n\033[1;36mBlocking on fetching the API key via password-store…\033[0m"
 OPENAI_API_KEY=$(pass show dev-vm/app/aider/chatgpt)
 printf "\n"
 
 export OPENAI_API_KEY
-exec aider --model "$LLM_MODEL" "$@"
+exec aider "$@"

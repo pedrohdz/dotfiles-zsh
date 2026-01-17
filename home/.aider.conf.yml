@@ -4,6 +4,8 @@
 ###############################################################################
 
 dark-mode: true
+model: gpt-5-chat-latest
+weak-model: gpt-5-mini
 
 
 #------------------------------------------------------------------------------
@@ -18,6 +20,7 @@ dark-mode: true
 # Other
 #------------------------------------------------------------------------------
 vim: true
+chat-mode: ask
 
 ## Enable/disable multi-line input mode with Meta-Enter to submit (default: False)
 multiline: true
