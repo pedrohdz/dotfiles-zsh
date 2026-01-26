@@ -28,7 +28,7 @@
           modules = [ ./home.nix ];
           extraSpecialArgs = {
             username = "pedro";
-            homeDirectory = "/home/pedro.linux";
+            homeDirectory = "/home/pedro";
           };
         };
         tester = home-manager.lib.homeManagerConfiguration {
