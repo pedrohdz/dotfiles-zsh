@@ -44,6 +44,13 @@
           };
         };
 
+        github-action-runner = {
+          system = "x86_64-linux";
+          users = {
+            tester = "/home/tester";
+          };
+        };
+
         # example mac host
         # mbp = {
         #   system = "aarch64-darwin";
