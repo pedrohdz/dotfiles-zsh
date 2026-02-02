@@ -37,6 +37,14 @@
           };
         };
 
+        lima-dev-test = {
+          system = "aarch64-linux";
+          users = {
+            pedro = "/home/pedro";
+            tester = "/home/tester";
+          };
+        };
+
         ubuntu2404 = {
           system = "aarch64-linux";
           users = {
