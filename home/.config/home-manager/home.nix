@@ -17,7 +17,7 @@
 
   # The home.packages option allows you to install Nix packages into your
   # environment.
-  home.packages = with pkgs; [
+  home.packages = with pkgs; lib.flatten [
     # # Adds the 'hello' command to your environment. It prints a friendly
     # # "Hello, world!" when run.
     # pkgs.hello
@@ -74,14 +74,12 @@
     grepcidr
     haskellPackages.argon2
     haskellPackages.hopenpgp-tools
-    helm
     htop
     # ignr
     imagemagick
     inetutils
     isort
     jq
-    kbd
     kubectl
     kubectx
     ldns
@@ -90,7 +88,6 @@
     minicom
     mtools
     neovim
-    netcat-openbsd
     nmap
     nodejs
     openssh
@@ -114,7 +111,6 @@
     python314
     qrencode
     ripgrep
-    rng-tools
     scrypt
     siege
     silver-searcher
@@ -128,9 +124,7 @@
     time
     tmux
     tor
-    traceroute
     tree
-    tsocks
     universal-ctags
     unrar
     unzip
@@ -182,6 +176,24 @@
     vim-language-server
     vscode-langservers-extracted
     yaml-language-server
+
+    # ----
+    # Linux only packages
+    # ----
+    (lib.optionals pkgs.stdenv.isLinux [
+      helm
+      kbd
+      netcat-openbsd
+      rng-tools
+      traceroute
+      tsocks
+    ])
+
+    # ----
+    # MacOS only packages
+    # ----
+    (lib.optionals pkgs.stdenv.isDarwin [
+    ])
 
     # ----
     # TODO - Checking these tools out

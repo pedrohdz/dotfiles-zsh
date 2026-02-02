@@ -1,8 +1,7 @@
 {
-  description = "Home Manager configuration of pedro";
+  description = "Home Manager configuration";
 
   inputs = {
-    # Specify the source of Home Manager and Nixpkgs.
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     home-manager = {
       url = "github:nix-community/home-manager/release-25.11";
@@ -10,35 +9,62 @@
     };
   };
 
-  outputs =
-    { nixpkgs, home-manager, ... }:
+  outputs = { nixpkgs, home-manager, ... }:
     let
-      system = "aarch64-linux";
-      pkgs = import nixpkgs {
+      lib = nixpkgs.lib;
+
+      mkPkgs = system: import nixpkgs {
         inherit system;
-        config = {
-          allowUnfree = true;
-        };
+        config.allowUnfree = true;
       };
-    in
-    {
-      homeConfigurations = {
-        pedro = home-manager.lib.homeManagerConfiguration {
-          inherit pkgs;
+
+      mkHm = system: username: homeDirectory:
+        home-manager.lib.homeManagerConfiguration {
+          pkgs = mkPkgs system;
           modules = [ ./home.nix ];
           extraSpecialArgs = {
-            username = "pedro";
-            homeDirectory = "/home/pedro";
+            inherit username homeDirectory;
           };
         };
-        tester = home-manager.lib.homeManagerConfiguration {
-          inherit pkgs;
-          modules = [ ./home.nix ];
-          extraSpecialArgs = {
-            username = "tester";
-            homeDirectory = "/home/tester";
+
+      # IMPORTANT: hostnames must match what `hostname` prints on that machine
+      hosts = {
+        lima-dev-vm = {
+          system = "aarch64-linux";
+          users = {
+            pedro = "/home/pedro";
+            tester = "/home/tester";
           };
         };
+
+        ubuntu2404 = {
+          system = "aarch64-linux";
+          users = {
+            tester = "/home/tester";
+          };
+        };
+
+        # example mac host
+        # mbp = {
+        #   system = "aarch64-darwin";
+        #   users = {
+        #     pedro = "/Users/pedro";
+        #     alice = "/Users/alice";
+        #   };
+        # };
       };
+
+      mkHostConfigs = host: cfg:
+        lib.mapAttrs'
+          (username: homeDirectory: {
+            name = "${username}@${host}";
+            value = mkHm cfg.system username homeDirectory;
+          })
+          cfg.users;
+
+    in {
+      homeConfigurations =
+        lib.foldl' lib.recursiveUpdate { }
+          (lib.mapAttrsToList mkHostConfigs hosts);
     };
 }
