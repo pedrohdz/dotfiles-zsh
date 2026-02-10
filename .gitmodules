@@ -1,3 +1,9 @@
 [submodule "ext/git-submodule-tools"]
 	path = ext/git-submodule-tools
 	url = https://github.com/kollerma/git-submodule-tools.git
+[submodule "home/.local/share/tmux/plugins/tmux-battery"]
+	path = home/.local/share/tmux/plugins/tmux-battery
+	url = https://github.com/tmux-plugins/tmux-battery
+[submodule "home/.local/share/tmux/plugins/tmux-cpu"]
+	path = home/.local/share/tmux/plugins/tmux-cpu
+	url = https://github.com/tmux-plugins/tmux-cpu
