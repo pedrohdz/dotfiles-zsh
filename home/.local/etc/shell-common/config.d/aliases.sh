@@ -29,7 +29,9 @@ alias wget-continue='wget --tries=50 --continue --waitretry=2'
 
 # Cleanup commands
 alias cbackups='find . -name "*~" -exec rm -v \{\} \;'
-alias chomeshick='find ~/.vim ~/.ssh ~/.local ~/.config ~/.tmux -xtype l -print -delete'
+alias chomeshick='find ~/.ssh ~/.local ~/.config ~/.tmux ~/.private ~/Library \
+  -path ~/.local/share/containers \
+  -prune -o -xtype l -print'
 
 if which python > /dev/null; then
   alias jsonpp='python -m json.tool'
