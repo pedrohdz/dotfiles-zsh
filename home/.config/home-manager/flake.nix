@@ -29,6 +29,15 @@
 
       # IMPORTANT: hostnames must match what `hostname` prints on that machine
       hosts = {
+        # TODO - Fix hostnam
+        vortex-2 = {
+          system = "aarch64-darwin";
+          users = {
+            pedro = "/Users/pedro";
+            pfh = "/Users/pfh";
+          };
+        };
+
         lima-dev-vm = {
           system = "aarch64-linux";
           users = {
@@ -58,15 +67,6 @@
             tester = "/home/tester";
           };
         };
-
-        # example mac host
-        # mbp = {
-        #   system = "aarch64-darwin";
-        #   users = {
-        #     pedro = "/Users/pedro";
-        #     alice = "/Users/alice";
-        #   };
-        # };
       };
 
       mkHostConfigs = host: cfg:

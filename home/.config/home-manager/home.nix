@@ -43,6 +43,7 @@
     # netcat-gnu
     # flake8
 
+    # ignr
     asciidoc
     aspell
     aspellDicts.en
@@ -75,7 +76,6 @@
     haskellPackages.argon2
     haskellPackages.hopenpgp-tools
     htop
-    # ignr
     imagemagick
     inetutils
     isort
@@ -85,6 +85,7 @@
     ldns
     less
     lftp
+    lima
     minicom
     mtools
     neovim
@@ -112,7 +113,6 @@
     qrencode
     ripgrep
     scrypt
-    siege
     silver-searcher
     smbclient-ng
     socat
@@ -128,6 +128,7 @@
     universal-ctags
     unrar
     unzip
+    util-linux
     vim
     watch
     wget
@@ -144,7 +145,6 @@
     zsh-completions
 
     # LLMs
-    aider-chat-full
     codex
     codex-acp
 
@@ -181,10 +181,12 @@
     # Linux only packages
     # ----
     (lib.optionals pkgs.stdenv.isLinux [
+      aider-chat
       helm
       kbd
       netcat-openbsd
       rng-tools
+      siege
       traceroute
       tsocks
     ])
@@ -193,6 +195,8 @@
     # MacOS only packages
     # ----
     (lib.optionals pkgs.stdenv.isDarwin [
+      aider-chat
+      wezterm
     ])
 
     # ----
@@ -211,8 +215,12 @@
     rclone
     rmlint
     tldr
-
   ];
+
+  programs.man = {
+    enable = true;
+    generateCaches = true;
+  };
 
   # Home Manager is pretty good at managing dotfiles. The primary way to manage
   # plain files is through 'home.file'.

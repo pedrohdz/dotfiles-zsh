@@ -11,29 +11,28 @@ umask 022
 export LC_ALL=en_US.UTF-8
 
 
-# FIXME - Android SDK for OS X (Pathes have changed.
-if [ -d "$HOME/dev/tool/adt-sdk" ] ; then
-  export ANDROID_HOME=$HOME/dev/tool/adt-sdk
+# if [ -d "$HOME/dev/tool/adt-sdk" ] ; then
+#   export ANDROID_HOME=$HOME/dev/tool/adt-sdk
+#
+#   if [ -d "$ANDROID_HOME/platform-tools" ] ; then
+#     export PATH=$ANDROID_HOME/platform-tools:$PATH
+#   fi
+#
+#   if [ -d "$ANDROID_HOME/tools" ] ; then
+#     export PATH=$ANDROID_HOME/tools:$PATH
+#   fi
+# fi
 
-  if [ -d "$ANDROID_HOME/platform-tools" ] ; then
-    export PATH=$ANDROID_HOME/platform-tools:$PATH
-  fi
-
-  if [ -d "$ANDROID_HOME/tools" ] ; then
-    export PATH=$ANDROID_HOME/tools:$PATH
-  fi
-fi
-
-# Java on OS X
-_java_version='17'
-if /usr/libexec/java_home -v "$_java_version" > /dev/null 2>&1; then
-  export JAVA_HOME=$(/usr/libexec/java_home -v "$_java_version")
-
-  if [ -d "$JAVA_HOME/bin" ]; then
-    export PATH=$JAVA_HOME/bin:$PATH
-  fi
-fi
-unset _java_version
+# # Java on OS X
+# _java_version='17'
+# if /usr/libexec/java_home -v "$_java_version" > /dev/null 2>&1; then
+#   export JAVA_HOME=$(/usr/libexec/java_home -v "$_java_version")
+#
+#   if [ -d "$JAVA_HOME/bin" ]; then
+#     export PATH=$JAVA_HOME/bin:$PATH
+#   fi
+# fi
+# unset _java_version
 
 # local user bin
 export USER_LOCAL="$HOME/.local"
@@ -41,44 +40,33 @@ if [ -d "$USER_LOCAL" ]; then
     if [ -d "$USER_LOCAL/bin" ]; then
         export PATH="$USER_LOCAL/bin:$PATH"
     fi
-    if [ -d "$USER_LOCAL/share/man" ]; then
-        export MANPATH="$USER_LOCAL/share/man:$MANPATH"
-    fi
+    # if [ -d "$USER_LOCAL/share/man" ]; then
+    #     export MANPATH="$USER_LOCAL/share/man:$MANPATH"
+    # fi
 fi
 
-# PATH variable for use with MacPorts.
-if [ -f "/opt/local/bin/port" ] ; then
-    export PATH=/opt/local/libexec/gnubin:/opt/local/bin:/opt/local/sbin:$PATH
-    export MANPATH=/opt/local/share/man:$MANPATH
-fi
+# # PATH variable for use with MacPorts.
+# if [ -f "/opt/local/bin/port" ] ; then
+#     export PATH=/opt/local/libexec/gnubin:/opt/local/bin:/opt/local/sbin:$PATH
+#     export MANPATH=/opt/local/share/man:$MANPATH
+# fi
 
-# devenv
-export DEVENV_ROOT='/opt/devenv'
-if [ -d "$DEVENV_ROOT" ]; then
-    if [ -d "$DEVENV_ROOT/bin" ]; then
-        export PATH="$DEVENV_ROOT/bin:$PATH"
-    fi
-    if [ -d "$DEVENV_ROOT/share/man" ]; then
-        export MANPATH="$DEVENV_ROOT/share/man:$MANPATH"
-    fi
-fi
+# # devenv
+# export DEVENV_ROOT='/opt/devenv'
+# if [ -d "$DEVENV_ROOT" ]; then
+#     if [ -d "$DEVENV_ROOT/bin" ]; then
+#         export PATH="$DEVENV_ROOT/bin:$PATH"
+#     fi
+#     if [ -d "$DEVENV_ROOT/share/man" ]; then
+#         export MANPATH="$DEVENV_ROOT/share/man:$MANPATH"
+#     fi
+# fi
 
-## Ruby Gem bins.
-#if which gem > /dev/null; then
-#  path_prefix=$(
-#    set -o errexit
-#    IFS=':'
-#    for current in $(gem environment gempath); do
-#      gem_bin_dir="$current/bin"
-#      if [ -d "$gem_bin_dir" ]; then
-#        gem_bin_path="${gem_bin_path:+$gem_bin_path:}$gem_bin_dir"
-#      fi
-#    done
-#    echo "$gem_bin_path"
-#  )
-#  export PATH="${path_prefix:+$path_prefix:}$PATH"
-#  unset path_prefix
-#fi
+if [ -z "$NIX_PROFILES" ] \
+  && [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]
+then
+  . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+fi
 
 
 #------------------------------------------------------------------------------
