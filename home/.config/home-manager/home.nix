@@ -96,8 +96,6 @@
     pandoc
     paperkey
     pass
-    podman
-    podman-tui
     proxychains-ng
     pv
     pwgen
@@ -185,6 +183,8 @@
       helm
       kbd
       netcat-openbsd
+      podman
+      podman-tui
       rng-tools
       siege
       traceroute
