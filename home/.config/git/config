@@ -44,7 +44,7 @@
 #------------------------------------------------------------------------------
 [commit]
   gpgSign = true
-  template = ~/.config/git/git-commit-msg
+  template = ~/.config/git/templates/default-commit-template.txt
 
 [tag]
   gpgSign = true
@@ -98,4 +98,4 @@
 # Includes (contains overrides)
 #------------------------------------------------------------------------------
 [include]
-  path = ~/.config/git/config-local
+  path = ~/.config/git/local.gitconfig
