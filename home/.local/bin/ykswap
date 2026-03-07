@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+SYMLINK_BASENAME='id_ed25519_sk'
+SSH_KEYS_DIRS=(
+  "$HOME/.ssh"
+  "$HOME/.ssh/"ids-*
+)
+
 
 #------------------------------------------------------------------------------
 # Core functions
@@ -11,14 +17,14 @@ set -o pipefail
 main()
 {
   verify_yk_connected
-  reload_gpg
   swap_ssh_keys
+  reload_gpg
 }
 
 verify_yk_connected()
 {
   local _count
-  _count=$(ykman list | wc -l)
+  _count=$(ykman list 2> /dev/null | wc -l)
   if [[ $_count -le 0 ]]; then
     fatal "No YubiKey found."
   elif [[ $_count -gt 1 ]]; then
@@ -40,23 +46,38 @@ reload_gpg()
 
 swap_ssh_keys()
 {
-  local _short_name _new_target _symlink
-  _symlink="$HOME/.ssh/id_ed25519_sk"
-  _short_name="$(device_short_name)"
-  _new_target=$(get_ssh_key_path "$_short_name")
+  local _yk_short_name; _yk_short_name="$(device_short_name)"
 
-  if [ "$_new_target" == "$(readlink -f "$_symlink")" ] \
-      && [ "$_new_target.pub" == "$(readlink -f "$_symlink.pub")" ]; then
-    log_warn "SSH key symlinks already set, skipping."
+  local \
+    _check_id_dir \
+    _source_id_file \
+    _target_id_file
+  for _check_id_dir in "${SSH_KEYS_DIRS[@]}"; do
+    _target_id_file="${_check_id_dir}/${SYMLINK_BASENAME}"
+    _source_id_file="${_target_id_file}_${_yk_short_name}"
+    if [ -f "$_source_id_file" ]; then
+      swap_ssh_key "$_source_id_file" "$_target_id_file"
+    fi
+  done
+}
+
+swap_ssh_key()
+{
+  local _source_id_file=$1
+  local _target_id_file=$2
+  local _log_description="(${_source_id_file/#$HOME/\~} -> ${_target_id_file/#$HOME/\~})"
+
+  if [ "$_source_id_file" == "$(readlink -f "$_target_id_file")" ] \
+      && [ "$_source_id_file.pub" == "$(readlink -f "$_target_id_file.pub")" ]
+  then
+    log_warn "SSH key symlinks already set, skipping. $_log_description"
     return
   fi
 
-  remove_ssh_identity "$_symlink"
-  local _new_target_base
-  _new_target_base=$(basename "$_new_target")
-  ln -sf "$_new_target_base" "$_symlink"
-  ln -sf "$_new_target_base.pub" "$_symlink.pub"
-  log_info "SSH key symlinks updated."
+  remove_ssh_identity "$_target_id_file"
+  ln -sf "$_source_id_file" "$_target_id_file"
+  ln -sf "$_source_id_file.pub" "$_target_id_file.pub"
+  log_info "SSH key symlinks updated. $_log_description"
 }
 
 device_short_name()
@@ -72,15 +93,6 @@ device_short_name()
   fi
 
   echo "$_short_name"
-}
-
-get_ssh_key_path() {
-  local _name
-  _name="$HOME/.ssh/id_ed25519_sk_$1"
-  if [ ! -f "$_name" ] || [ ! -f "$_name.pub" ]; then
-    fatal "SSH key file does not exist for '$_name'."
-  fi
-  echo "$_name"
 }
 
 remove_ssh_identity()
