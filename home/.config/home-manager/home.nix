@@ -143,6 +143,7 @@
     zsh-completions
 
     # LLMs
+    claude-code
     codex
     codex-acp
 
@@ -162,7 +163,7 @@
 
     # LSPs
     bash-language-server
-    dockerfile-language-server-nodejs
+    dockerfile-language-server
     helm-ls
     lua-language-server
     nixd
