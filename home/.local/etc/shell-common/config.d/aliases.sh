@@ -30,7 +30,7 @@ alias wget-continue='wget --tries=50 --continue --waitretry=2'
 # Cleanup commands
 alias cbackups='find . -name "*~" -exec rm -v \{\} \;'
 alias chomeshick='find \
-  ~/.ssh ~/.local ~/.config ~/.tmux ~/.private ~/Library \
+  ~/.ssh ~/.local ~/.config ~/.tmux ~/.private \
   -path ~/.local/share/containers -prune -o \
   -xtype l -print \
   -exec rm "{}" ";"'
