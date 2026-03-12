@@ -153,4 +153,4 @@ $RECYCLE.BIN/
 # Local configuration
 #------------------------------------------------------------------------------
 
-# vim: filetype=conf
+# vim: filetype=gitignore
