@@ -1,0 +1,20 @@
+#! /usr/bin/env bash
+
+set -o pipefail
+set -o nounset
+set -o errexit
+
+repo_uri=${1:?Provide the URI for the git repository as the first argument}
+
+target_dir=${repo_uri##*/}
+
+mkdir -p "$target_dir"
+git clone --bare "$repo_uri" "$target_dir/.bare"
+echo "gitdir: .bare" > "$target_dir/.git"
+git -C "$target_dir" config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
+git -C "$target_dir" fetch --all
+
+default_branch_ref=$(git -C "$target_dir" symbolic-ref HEAD)
+default_branch_name=${default_branch_ref##*/}
+
+git -C "$target_dir" worktree add "$default_branch_name" "$default_branch_name"
