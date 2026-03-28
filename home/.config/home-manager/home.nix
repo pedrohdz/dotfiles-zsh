@@ -144,8 +144,6 @@
 
     # LLMs
     claude-code
-    codex
-    codex-acp
 
     # Linters & code analysis
     ansible-lint

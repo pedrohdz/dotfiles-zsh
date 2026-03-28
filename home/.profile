@@ -34,17 +34,6 @@ export LC_ALL=en_US.UTF-8
 # fi
 # unset _java_version
 
-# local user bin
-export USER_LOCAL="$HOME/.local"
-if [ -d "$USER_LOCAL" ]; then
-    if [ -d "$USER_LOCAL/bin" ]; then
-        export PATH="$USER_LOCAL/bin:$PATH"
-    fi
-    # if [ -d "$USER_LOCAL/share/man" ]; then
-    #     export MANPATH="$USER_LOCAL/share/man:$MANPATH"
-    # fi
-fi
-
 # # PATH variable for use with MacPorts.
 # if [ -f "/opt/local/bin/port" ] ; then
 #     export PATH=/opt/local/libexec/gnubin:/opt/local/bin:/opt/local/sbin:$PATH
@@ -61,6 +50,13 @@ fi
 #         export MANPATH="$DEVENV_ROOT/share/man:$MANPATH"
 #     fi
 # fi
+
+# local user bin
+export USER_LOCAL="$HOME/.local"
+if [ -d "$USER_LOCAL" ] && [ -d "$USER_LOCAL/bin" ]; then
+  export PATH="$PATH:$USER_LOCAL/bin"
+  # export PATH="$USER_LOCAL/bin:$PATH"
+fi
 
 if [ -z "$NIX_PROFILES" ] \
   && [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]

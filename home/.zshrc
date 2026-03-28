@@ -13,13 +13,6 @@ fi
 # TODO - Should we drop the lines with $ZSH_VERSION completely?
 function
 {
-  local _port_prefix
-  if which port > /dev/null; then
-    _port_prefix=$(dirname "$(dirname "$(which port)")")
-  else
-    _port_prefix="/opt/local"
-  fi
-
   # Nix Profiles
   _nix_profiles=("${(@Oa)${(s: :)NIX_PROFILES}}")  # Splits and reverses order
   local _nix_profiles_fpaths=()
@@ -27,23 +20,16 @@ function
   for _nix_profile in "${_nix_profiles[@]}"; do
     _nix_profiles_fpaths+=(
       "$_nix_profile/share/zsh/site-functions"
-      # "$_nix_profile/share/zsh/$ZSH_VERSION/functions"
     )
   done
 
   # Paths
   local _paths=(
-    "${_nix_profiles_fpaths[@]}"
-    "$HOME/.homesick/repos/homeshick/completions"
     "$HOME/.local/share/zsh/site-functions"
-    "/opt/devenv/share/zsh/site-functions"
-    # "/opt/devenv/share/zsh/$ZSH_VERSION/functions"
-    "${_port_prefix:+$_port_prefix/share/zsh/site-functions}"
-    # "${_port_prefix:+$_port_prefix/share/zsh/$ZSH_VERSION/functions}"
+    "$HOME/.homesick/repos/homeshick/completions"
+    "${_nix_profiles_fpaths[@]}"
     "/usr/local/share/zsh/site-functions"
-    # "/usr/local/share/zsh/$ZSH_VERSION/functions"
     "/usr/share/zsh/site-functions"
-    # "/usr/share/zsh/$ZSH_VERSION/functions"
   )
 
   # Build the initial list
