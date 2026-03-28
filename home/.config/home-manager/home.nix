@@ -68,7 +68,6 @@
     git-secret
     gnugrep
     gnumake
-    gnupg
     gnused
     gnutar
     graphviz
@@ -141,6 +140,13 @@
     zip
     zsh
     zsh-completions
+
+    # GNU Privacy Guard
+    gnupg
+    (lib.optionals pkgs.stdenv.isDarwin [
+      pinentry_mac # Broken!!!  Use the one from MacPorts
+    ])
+    # pinentry-qt
 
     # LLMs
     claude-code
