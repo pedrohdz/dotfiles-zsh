@@ -1,13 +1,15 @@
 # shellcheck shell=bash
 
-# TODO - Does not seem to be working!
 
-if ! which terraform > /dev/null; then
+if ! terraform version > /dev/null 2>&1; then
+# if ! command -v terraform > /dev/null; then
   return 0
 fi
 
-autoload -U +X bashcompinit && bashcompinit
-autoload -Uz compinit && compinit
+# Only init bashcompinit once
+if ! whence -w complete > /dev/null 2>&1; then
+  autoload -U +X bashcompinit && bashcompinit
+fi
 
 complete -o nospace -C terraform terraform
 

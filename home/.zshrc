@@ -105,8 +105,31 @@ bindkey '\e[B' history-beginning-search-forward
 
 
 #------------------------------------------------------------------------------
-# Functions
+# Completion
 #------------------------------------------------------------------------------
+# Warning - Must run after `dircolors` to load `LS_COLORS`.
+# The following lines were added by compinstall
+zstyle ':completion:*' completer _expand _complete _ignored
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*' insert-unambiguous true
+zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
+zstyle ':completion:*' matcher-list ''
+zstyle ':completion:*' menu yes=long select=0
+zstyle ':completion:*' original true
+zstyle ':completion:*' select-prompt '%SScrolling active: current selection at %p%s'
+zstyle ':completion:*' verbose true
+zstyle :compinstall filename "$HOME/.zshrc"
+
+autoload -Uz compinit
+compinit
+
+
+#------------------------------------------------------------------------------
+# Includes
+#------------------------------------------------------------------------------
+# NOTE - Must come after the "Completion" section since includes might contain
+# completion configuration that requires the above to be initialized first.
+#
 # Source common includes
 function {
   local _includes
@@ -124,26 +147,6 @@ function {
     fi
   done
 }
-
-
-#==============================================================================
-# Completion
-#==============================================================================
-# Warning - Must run after `dircolors` to load `LS_COLORS`.
-# The following lines were added by compinstall
-zstyle ':completion:*' completer _expand _complete _ignored
-zstyle ':completion:*' group-name ''
-zstyle ':completion:*' insert-unambiguous true
-zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
-zstyle ':completion:*' matcher-list ''
-zstyle ':completion:*' menu yes=long select=0
-zstyle ':completion:*' original true
-zstyle ':completion:*' select-prompt '%SScrolling active: current selection at %p%s'
-zstyle ':completion:*' verbose true
-zstyle :compinstall filename "$HOME/.zshrc"
-
-autoload -Uz compinit
-compinit
 
 
 #------------------------------------------------------------------------------
