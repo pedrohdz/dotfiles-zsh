@@ -51,16 +51,16 @@
   # last prompt line gets hidden if it would overlap with left prompt.
   typeset -g POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(
     # =========================[ Line #0 ]=========================
-    command_execution_time  # duration of the last command
     background_jobs         # presence of background jobs
-    vi_mode                 # vi mode (you don't need this if you've enabled prompt_char)
-    nix_shell               # nix shell (https://nixos.org/nixos/nix-pills/developing-with-nix-shell.html)
     aws                     # aws profile (https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html)
     kubecontext             # current kubernetes context (https://kubernetes.io/)
     terraform               # terraform workspace (https://www.terraform.io)
     azure                   # azure account name (https://docs.microsoft.com/en-us/cli/azure)
     pyenv                   # python environment (https://github.com/pyenv/pyenv)
     virtualenv              # python virtual environment (https://docs.python.org/3/library/venv.html)
+    vi_mode                 # vi mode (you don't need this if you've enabled prompt_char)
+    nix_shell               # nix shell (https://nixos.org/nixos/nix-pills/developing-with-nix-shell.html)
+    command_execution_time  # duration of the last command
     newline                 # \n
     # =========================[ Line #1 ]=========================
     #terraform_version       # terraform version (https://www.terraform.io)
