@@ -5,19 +5,14 @@ set -o nounset
 set -o pipefail
 
 BRANCH=${1:?Usage: $0 <branch-name> [base-ref]}
-BASE=${2:-main}
+DIRECTORY="@${BRANCH}"
+BASE=${2:-origin/main}
 
-# Create remote branch from base
-git push origin "origin/${BASE}:refs/heads/${BRANCH}" 2>/dev/null || \
-  echo "Remote branch origin/${BRANCH} already exists, skipping push."
-
-# Fetch so the remote ref is visible locally
-git fetch origin "${BRANCH}"
+# Create branch locally
+git branch --no-track "$BRANCH" "$BASE" \
+  || echo "WARNING - Branch '$BRANCH' already exists."
 
 # Add worktree tracking the new remote branch
-git worktree add -b "${BRANCH}" "${BRANCH}" "origin/${BRANCH}"
+git worktree add "${DIRECTORY}" "${BRANCH}"
 
-# Set upstream explicitly (belt and suspenders)
-git -C "${BRANCH}" branch --set-upstream-to="origin/${BRANCH}" "${BRANCH}"
-
-echo "Done. Worktree '${BRANCH}' created, tracking origin/${BRANCH}."
+echo "Done. Worktree '$BRANCH' created in './$DIRECTORY/'."
