@@ -1,0 +1,172 @@
+#! /usr/bin/env bash
+
+set -o pipefail
+set -o errexit
+set -o nounset
+
+# ---------------------------------------------------------------------------
+# Defaults (auto-detected from platform and environment)
+# ---------------------------------------------------------------------------
+if [[ "$(uname)" == Darwin ]]; then
+  FORMAT=richtext
+  OUTPUT=pasteboard
+else
+  FORMAT=markdown
+  if [[ -n "${TMUX:-}" ]]; then
+    OUTPUT=tmux
+  else
+    OUTPUT=stdout
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Argument parsing (GNU getopt — long options)
+# ---------------------------------------------------------------------------
+_opts=$(getopt -o f:o: --long format:,output: -n "$(basename "$0")" -- "$@")
+eval set -- "$_opts"
+while true; do
+  case "$1" in
+    -f|--format) FORMAT="$2"; shift 2 ;;
+    -o|--output) OUTPUT="$2"; shift 2 ;;
+    --) shift; break ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+case "$FORMAT" in
+  markdown|richtext|plain-text) ;;
+  *) echo "Invalid --format '$FORMAT'. Use: markdown, richtext, plain-text" >&2; exit 1 ;;
+esac
+
+case "$OUTPUT" in
+  pbcopy|tmux|stdout|pasteboard) ;;
+  *) echo "Invalid --output '$OUTPUT'. Use: pbcopy, tmux, stdout, pasteboard" >&2; exit 1 ;;
+esac
+
+if [[ "$OUTPUT" == pasteboard && "$(uname)" != Darwin ]]; then
+  echo "Error: --output pasteboard is only supported on macOS" >&2
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Diagnostics
+# ---------------------------------------------------------------------------
+echo "$(basename "$0"): $FORMAT → $OUTPUT" >&2
+
+# ---------------------------------------------------------------------------
+# Credentials
+# ---------------------------------------------------------------------------
+export JIRA_API_TOKEN
+JIRA_API_TOKEN=$(pass show vortex.offline.n0p/pfh/outnordic/app/jira-cli)
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+EM_DASH=$'\xe2\x80\x94'  # U+2014
+
+_html_escape() {
+  local s="$1"
+  s="${s//&/&amp;}"
+  s="${s//</&lt;}"
+  s="${s//>/&gt;}"
+  s="${s//\"/&quot;}"
+  printf '%s' "$s"
+}
+
+_pasteboard() {
+  local rtf="$1" plain="$2"
+  osascript -l JavaScript - "$rtf" "$plain" <<'JXA'
+    ObjC.import("AppKit");
+    function run(argv) {
+      var pb = $.NSPasteboard.generalPasteboard;
+      pb.clearContents;
+      var data = $.NSString.alloc.initWithUTF8String(argv[0])
+                   .dataUsingEncoding($.NSUTF8StringEncoding);
+      pb.setDataForType(data, $.NSPasteboardTypeRTF);
+      pb.setStringForType($(argv[1]), $.NSPasteboardTypeString);
+    }
+JXA
+}
+
+_send() {
+  local text="$1" rtf="${2:-}"
+  local content="${rtf:-$text}"
+  case "$OUTPUT" in
+    stdout)     printf '%s\n' "$content" ;;
+    pbcopy)     printf '%s' "$content" | pbcopy ;;
+    tmux)       printf '%s' "$content" | tmux load-buffer -w - ;;
+    pasteboard) _pasteboard "$rtf" "$text" ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------
+# Read URLs from stdin; store keys, titles, urls in parallel arrays
+# ---------------------------------------------------------------------------
+keys=()
+titles=()
+urls=()
+
+while IFS= read -r input; do
+  [[ -z "$input" ]] && continue
+  if [[ "$input" == *"/"* ]]; then
+    issue_key="${input##*/}"
+  else
+    issue_key="$input"
+  fi
+  json=$(jira issue view "$issue_key" --raw)
+  title=$(jq -r '.fields.summary' <<< "$json")
+  url=$(jq -r '(.self | split("/")[:3] | join("/")) + "/browse/" + .key' <<< "$json")
+  keys+=("$issue_key")
+  titles+=("$title")
+  urls+=("$url")
+done
+
+# ---------------------------------------------------------------------------
+# Build and emit output
+# ---------------------------------------------------------------------------
+_plain_text() {
+  local out="" prefix=""
+  (( ${#keys[@]} > 1 )) && prefix=$'\xe2\x80\xa2'" "  # U+2022 bullet
+  for i in "${!keys[@]}"; do
+    out+="${prefix}${keys[$i]} ${EM_DASH} ${titles[$i]} (${urls[$i]})"$'\n'
+  done
+  printf '%s' "${out%$'\n'}"
+}
+
+_markdown() {
+  local out="" prefix=""
+  (( ${#keys[@]} > 1 )) && prefix="- "
+  for i in "${!keys[@]}"; do
+    out+="${prefix}[${keys[$i]} ${EM_DASH} ${titles[$i]}](${urls[$i]})"$'\n'
+  done
+  printf '%s' "${out%$'\n'}"
+}
+
+_richtext() {
+  local html_body
+  if (( ${#keys[@]} == 1 )); then
+    local ek et eu
+    ek=$(_html_escape "${keys[0]}")
+    et=$(_html_escape "${titles[0]}")
+    eu=$(_html_escape "${urls[0]}")
+    html_body="<p><a href=\"${eu}\">${ek} &mdash; ${et}</a></p>"
+  else
+    local i ek et eu
+    html_body="<ul>"$'\n'
+    for i in "${!keys[@]}"; do
+      ek=$(_html_escape "${keys[$i]}")
+      et=$(_html_escape "${titles[$i]}")
+      eu=$(_html_escape "${urls[$i]}")
+      html_body+="<li><a href=\"${eu}\">${ek} &mdash; ${et}</a></li>"$'\n'
+    done
+    html_body+="</ul>"
+  fi
+  printf '<html><body>%s</body></html>' "$html_body" \
+    | textutil -convert rtf -format html -stdin -stdout
+}
+
+case "$FORMAT" in
+  plain-text)  _send "$(_plain_text)" ;;
+  markdown)    _send "$(_markdown)" ;;
+  richtext)    _send "$(_plain_text)" "$(_richtext)" ;;
+esac
