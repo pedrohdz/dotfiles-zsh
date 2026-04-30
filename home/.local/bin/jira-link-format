@@ -19,6 +19,7 @@ html_escape() {
   _string="${_string//</&lt;}"
   _string="${_string//>/&gt;}"
   _string="${_string//\"/&quot;}"
+  _string="${_string//\'/&#39;}"
   printf '%s' "$_string"
 }
 
@@ -72,6 +73,20 @@ extract_issue_key() {
   printf '%s' "$_raw"
 }
 
+validate_issue_key() {
+  [[ "$1" =~ ^[A-Z]+-[0-9]+$ ]] \
+    || fatal "Invalid issue key: '$1'"
+}
+
+print_status() {
+  if [[ -t 2 ]]; then
+    printf '\033[1m%s\033[0m: \033[36m%s\033[0m → \033[36m%s\033[0m\n' \
+      "${0##*/}" "$_FORMAT" "$_OUTPUT" >&2
+  else
+    printf '%s: %s → %s\n' "${0##*/}" "$_FORMAT" "$_OUTPUT" >&2
+  fi
+}
+
 
 # ---------------------------------------------------------------------------
 # Argument parsing and configuration
@@ -94,8 +109,13 @@ configure() {
   fi
 
   # Argument parsing (GNU getopt — long options)
+  # GNU getopt signals availability by exiting 4; capture without triggering errexit
+  local _getopt_rc=0; getopt --test > /dev/null 2>&1 || _getopt_rc=$?
+  (( _getopt_rc == 4 )) \
+    || fatal "GNU getopt required (BSD getopt detected)."
+
   local _opts
-  _opts=$(getopt -o hf:o: --long help,format:,output: -n "$(basename "$0")" -- "$@")
+  _opts=$(getopt -o hf:o: --long help,format:,output: -n "${0##*/}" -- "$@")
   eval set -- "$_opts"
   while true; do
     case "$1" in
@@ -130,26 +150,20 @@ configure() {
 
 
 # ---------------------------------------------------------------------------
-# Input processing
+# Entry data
 # ---------------------------------------------------------------------------
-# Read issue keys or URLs from stdin; store keys, titles, urls in parallel
-# arrays
 _ENTRY_KEYS=()
 _ENTRY_TITLES=()
 _ENTRY_URLS=()
 
-process_entries() {
-  if [[ -t 2 ]]; then
-    printf '\033[1m%s\033[0m: \033[36m%s\033[0m → \033[36m%s\033[0m\n' \
-      "${0##*/}" "$_FORMAT" "$_OUTPUT" >&2
-  else
-    printf '%s: %s → %s\n' "${0##*/}" "$_FORMAT" "$_OUTPUT" >&2
-  fi
-
+fetch_entries() {
   local _input _issue_key _json _title _url _inputs=()
   if (( ${#_ARGS[@]} > 0 )); then
     _inputs=("${_ARGS[@]}")
   else
+    [[ -t 0 ]] \
+      && fatal "No issue keys given. Pass as arguments or pipe via stdin."
+
     while IFS= read -r _input; do
       [[ -n "$_input" ]] && _inputs+=("$_input")
     done
@@ -157,6 +171,8 @@ process_entries() {
 
   for _input in "${_inputs[@]}"; do
     _issue_key=$(extract_issue_key "$_input")
+    validate_issue_key "$_issue_key"
+    # FIXME: token passed via env var is briefly readable from /proc/<pid>/environ on Linux
     _json=$(JIRA_API_TOKEN="$JIRA_API_TOKEN" jira issue view "$_issue_key" --raw)
     _title=$(jq -r '.fields.summary' <<< "$_json")
     _url=$(jq -r '(.self | split("/")[:3] | join("/")) + "/browse/" + .key' <<< "$_json")
@@ -164,12 +180,6 @@ process_entries() {
     _ENTRY_TITLES+=("$_title")
     _ENTRY_URLS+=("$_url")
   done
-
-  case "$_FORMAT" in
-    plain-text)  output "$(format_plain_text)" ;;
-    markdown)    output "$(format_markdown)" ;;
-    richtext)    output "$(format_plain_text)" "$(format_richtext)" ;;
-  esac
 }
 
 
@@ -254,9 +264,19 @@ output() {
   esac
 }
 
+emit() {
+  case "$_FORMAT" in
+    plain-text)  output "$(format_plain_text)" ;;
+    markdown)    output "$(format_markdown)" ;;
+    richtext)    output "$(format_plain_text)" "$(format_richtext)" ;;
+  esac
+}
+
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 configure "$@"
-process_entries
+print_status
+fetch_entries
+emit
