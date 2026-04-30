@@ -22,6 +22,11 @@ html_escape() {
   printf '%s' "$_string"
 }
 
+fatal() {
+  echo "FATAL - $*" >&2
+  exit 1
+}
+
 
 # ---------------------------------------------------------------------------
 # Argument parsing and configuration
@@ -51,31 +56,27 @@ configure() {
       -f|--format) _FORMAT="$2"; shift 2 ;;
       -o|--output) _OUTPUT="$2"; shift 2 ;;
       --) shift; break ;;
-      *) echo "Unknown option: $1" >&2; exit 1 ;;
+      *) fatal "Unknown option: $1" ;;
     esac
   done
 
   case "$_FORMAT" in
     markdown|richtext|plain-text) ;;
-    *) echo "Invalid --format '$_FORMAT'. Use: markdown, richtext, plain-text" >&2; exit 1 ;;
+    *) fatal "Invalid --format '$_FORMAT'. Use: markdown, richtext, plain-text" ;;
   esac
 
   case "$_OUTPUT" in
     pbcopy|tmux|stdout|pasteboard) ;;
-    *) echo "Invalid --output '$_OUTPUT'. Use: pbcopy, tmux, stdout, pasteboard" >&2; exit 1 ;;
+    *) fatal "Invalid --output '$_OUTPUT'. Use: pbcopy, tmux, stdout, pasteboard" ;;
   esac
 
-  if [[ "$_OUTPUT" == pasteboard && "$(uname)" != Darwin ]]; then
-    echo "Error: --output pasteboard is only supported on macOS" >&2
-    exit 1
-  fi
+  [[ "$_OUTPUT" == pasteboard && "$(uname)" != Darwin ]] \
+    && fatal "--output pasteboard is only supported on macOS"
 
   # Credentials
   if [[ -z "${JIRA_API_TOKEN:-}" ]]; then
-    JIRA_API_TOKEN=$(pass show "$PASSWORD_STORE_KEY" 2> /dev/null) || {
-      echo "Error: Failed to retrieve JIRA API token from password store at '$PASSWORD_STORE_KEY'" >&2
-      exit 1
-    }
+    JIRA_API_TOKEN=$(pass show "$PASSWORD_STORE_KEY" 2>/dev/null) \
+      || fatal "Failed to retrieve JIRA API token from password store at '$PASSWORD_STORE_KEY'"
   else
     echo "Info: Using JIRA_API_TOKEN from environment variable" >&2
   fi
