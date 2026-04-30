@@ -62,6 +62,16 @@ Environment:
 EOF
 }
 
+extract_issue_key() {
+  local _raw="$1"
+  if [[ "$_raw" == *"/"* ]]; then
+    _raw="${_raw##*/}"    # strip up to last /
+    _raw="${_raw%%\?*}"   # strip ?query-string
+    _raw="${_raw%%#*}"    # strip #fragment
+  fi
+  printf '%s' "$_raw"
+}
+
 
 # ---------------------------------------------------------------------------
 # Argument parsing and configuration
@@ -137,11 +147,7 @@ process_entries() {
   local _input _issue_key _json _title _url
   while IFS= read -r _input; do
     [[ -z "$_input" ]] && continue
-    if [[ "$_input" == *"/"* ]]; then
-      _issue_key="${_input##*/}"
-    else
-      _issue_key="$_input"
-    fi
+    _issue_key=$(extract_issue_key "$_input")
     _json=$(JIRA_API_TOKEN="$JIRA_API_TOKEN" jira issue view "$_issue_key" --raw)
     _title=$(jq -r '.fields.summary' <<< "$_json")
     _url=$(jq -r '(.self | split("/")[:3] | join("/")) + "/browse/" + .key' <<< "$_json")
