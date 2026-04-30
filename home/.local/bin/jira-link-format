@@ -4,12 +4,8 @@ set -o pipefail
 set -o errexit
 set -o nounset
 
+PASSWORD_STORE_KEY=${PASSWORD_STORE_KEY:-vortex.offline.n0p/pfh/outnordic/app/jira-cli}
 
-# ---------------------------------------------------------------------------
-# Credentials
-# ---------------------------------------------------------------------------
-export JIRA_API_TOKEN
-JIRA_API_TOKEN=$(pass show vortex.offline.n0p/pfh/outnordic/app/jira-cli)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -27,6 +23,66 @@ html_escape() {
 
 
 # ---------------------------------------------------------------------------
+# Argument parsing and configuration
+# ---------------------------------------------------------------------------
+_FORMAT=""
+_OUTPUT=""
+configure() {
+  # Defaults (auto-detected from platform and environment)
+  if [[ "$(uname)" == Darwin ]]; then
+    _FORMAT=richtext
+    _OUTPUT=pasteboard
+  else
+    _FORMAT=markdown
+    if [[ -n "${TMUX:-}" ]]; then
+      _OUTPUT=tmux
+    else
+      _OUTPUT=stdout
+    fi
+  fi
+
+  # Argument parsing (GNU getopt — long options)
+  local _opts
+  _opts=$(getopt -o f:o: --long format:,output: -n "$(basename "$0")" -- "$@")
+  eval set -- "$_opts"
+  while true; do
+    case "$1" in
+      -f|--format) _FORMAT="$2"; shift 2 ;;
+      -o|--output) _OUTPUT="$2"; shift 2 ;;
+      --) shift; break ;;
+      *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  case "$_FORMAT" in
+    markdown|richtext|plain-text) ;;
+    *) echo "Invalid --format '$_FORMAT'. Use: markdown, richtext, plain-text" >&2; exit 1 ;;
+  esac
+
+  case "$_OUTPUT" in
+    pbcopy|tmux|stdout|pasteboard) ;;
+    *) echo "Invalid --output '$_OUTPUT'. Use: pbcopy, tmux, stdout, pasteboard" >&2; exit 1 ;;
+  esac
+
+  if [[ "$_OUTPUT" == pasteboard && "$(uname)" != Darwin ]]; then
+    echo "Error: --output pasteboard is only supported on macOS" >&2
+    exit 1
+  fi
+
+  # Credentials
+  if [[ -z "${JIRA_API_TOKEN:-}" ]]; then
+    JIRA_API_TOKEN=$(pass show "$PASSWORD_STORE_KEY" 2> /dev/null) || {
+      echo "Error: Failed to retrieve JIRA API token from password store at '$PASSWORD_STORE_KEY'" >&2
+      exit 1
+    }
+  else
+    echo "Info: Using JIRA_API_TOKEN from environment variable" >&2
+  fi
+}
+
+
+
+# ---------------------------------------------------------------------------
 # Input processing
 # ---------------------------------------------------------------------------
 # Read URLs from stdin; store keys, titles, urls in parallel arrays
@@ -35,7 +91,7 @@ _ENTRY_TITLES=()
 _ENTRY_URLS=()
 
 process_entries() {
-  echo "$(basename "$0"): $FORMAT → $OUTPUT" >&2
+  echo "$(basename "$0"): $_FORMAT → $_OUTPUT" >&2
 
   local _input _issue_key _json _title _url
   while IFS= read -r _input; do
@@ -45,7 +101,7 @@ process_entries() {
     else
       _issue_key="$_input"
     fi
-    _json=$(jira issue view "$_issue_key" --raw)
+    _json=$(JIRA_API_TOKEN="$JIRA_API_TOKEN" jira issue view "$_issue_key" --raw)
     _title=$(jq -r '.fields.summary' <<< "$_json")
     _url=$(jq -r '(.self | split("/")[:3] | join("/")) + "/browse/" + .key' <<< "$_json")
     _ENTRY_KEYS+=("$_issue_key")
@@ -53,7 +109,7 @@ process_entries() {
     _ENTRY_URLS+=("$_url")
   done
 
-  case "$FORMAT" in
+  case "$_FORMAT" in
     plain-text)  output "$(format_plain_text)" ;;
     markdown)    output "$(format_markdown)" ;;
     richtext)    output "$(format_plain_text)" "$(format_richtext)" ;;
@@ -127,7 +183,7 @@ JXA
 output() {
   local _text="$1" _rtf="${2:-}"
   local _content="${_rtf:-$_text}"
-  case "$OUTPUT" in
+  case "$_OUTPUT" in
     stdout)     printf '%s\n' "$_content" ;;
     pbcopy)     printf '%s' "$_content" | pbcopy ;;
     tmux)       printf '%s' "$_content" | tmux load-buffer -w - ;;
@@ -137,49 +193,7 @@ output() {
 
 
 # ---------------------------------------------------------------------------
-# Main logic
+# Main
 # ---------------------------------------------------------------------------
-parse_args() {
-  # Defaults (auto-detected from platform and environment)
-  if [[ "$(uname)" == Darwin ]]; then
-    FORMAT=richtext
-    OUTPUT=pasteboard
-  else
-    FORMAT=markdown
-    if [[ -n "${TMUX:-}" ]]; then
-      OUTPUT=tmux
-    else
-      OUTPUT=stdout
-    fi
-  fi
-
-  # Argument parsing (GNU getopt — long options)
-  _opts=$(getopt -o f:o: --long format:,output: -n "$(basename "$0")" -- "$@")
-  eval set -- "$_opts"
-  while true; do
-    case "$1" in
-      -f|--format) FORMAT="$2"; shift 2 ;;
-      -o|--output) OUTPUT="$2"; shift 2 ;;
-      --) shift; break ;;
-      *) echo "Unknown option: $1" >&2; exit 1 ;;
-    esac
-  done
-
-  case "$FORMAT" in
-    markdown|richtext|plain-text) ;;
-    *) echo "Invalid --format '$FORMAT'. Use: markdown, richtext, plain-text" >&2; exit 1 ;;
-  esac
-
-  case "$OUTPUT" in
-    pbcopy|tmux|stdout|pasteboard) ;;
-    *) echo "Invalid --output '$OUTPUT'. Use: pbcopy, tmux, stdout, pasteboard" >&2; exit 1 ;;
-  esac
-
-  if [[ "$OUTPUT" == pasteboard && "$(uname)" != Darwin ]]; then
-    echo "Error: --output pasteboard is only supported on macOS" >&2
-    exit 1
-  fi
-}
-
-parse_args "$@"
+configure "$@"
 process_entries
