@@ -27,6 +27,41 @@ fatal() {
   exit 1
 }
 
+usage() {
+  cat <<EOF
+Usage: ${0##*/} [-f FORMAT] [-o OUTPUT] < issue-keys-or-urls
+
+Read JIRA issue keys or URLs from stdin, fetch their titles via the
+JIRA API, and emit formatted links.
+
+Options:
+  -f, --format FORMAT   Output format
+                          markdown    Markdown hyperlink
+                          richtext    RTF hyperlink (macOS only)
+                          plain-text  Plain text with URL in parentheses
+  -o, --output OUTPUT   Output destination
+                          pasteboard  macOS pasteboard — RTF + plain text (macOS only)
+                          pbcopy      pbcopy (macOS)
+                          tmux        tmux load-buffer
+                          stdout      Standard output
+  -h, --help            Show this help and exit
+
+Defaults (auto-detected):
+  macOS   --format richtext  --output pasteboard
+  other   --format markdown  --output tmux (in tmux) or stdout
+
+Input:
+  One issue key or URL per line on stdin.
+  Bare keys (ECO-123) and full URLs (https://…/browse/ECO-123) are both accepted.
+  Multiple entries produce a bulleted list.
+
+Environment:
+  JIRA_API_TOKEN      API token. If unset, retrieved from pass(1).
+  PASSWORD_STORE_KEY  pass(1) path for the token.
+                      Default: $PASSWORD_STORE_KEY
+EOF
+}
+
 
 # ---------------------------------------------------------------------------
 # Argument parsing and configuration
@@ -49,10 +84,11 @@ configure() {
 
   # Argument parsing (GNU getopt — long options)
   local _opts
-  _opts=$(getopt -o f:o: --long format:,output: -n "$(basename "$0")" -- "$@")
+  _opts=$(getopt -o hf:o: --long help,format:,output: -n "$(basename "$0")" -- "$@")
   eval set -- "$_opts"
   while true; do
     case "$1" in
+      -h|--help)   usage; exit 0 ;;
       -f|--format) _FORMAT="$2"; shift 2 ;;
       -o|--output) _OUTPUT="$2"; shift 2 ;;
       --) shift; break ;;
@@ -81,7 +117,6 @@ configure() {
 }
 
 
-
 # ---------------------------------------------------------------------------
 # Input processing
 # ---------------------------------------------------------------------------
@@ -93,7 +128,8 @@ _ENTRY_URLS=()
 
 process_entries() {
   if [[ -t 2 ]]; then
-    printf '\033[1m%s\033[0m: \033[36m%s\033[0m → \033[36m%s\033[0m\n' "${0##*/}" "$_FORMAT" "$_OUTPUT" >&2
+    printf '\033[1m%s\033[0m: \033[36m%s\033[0m → \033[36m%s\033[0m\n' \
+      "${0##*/}" "$_FORMAT" "$_OUTPUT" >&2
   else
     printf '%s: %s → %s\n' "${0##*/}" "$_FORMAT" "$_OUTPUT" >&2
   fi
