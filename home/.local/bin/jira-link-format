@@ -29,10 +29,10 @@ fatal() {
 
 usage() {
   cat <<EOF
-Usage: ${0##*/} [-f FORMAT] [-o OUTPUT] < issue-keys-or-urls
+Usage: ${0##*/} [-f FORMAT] [-o OUTPUT] [ISSUE-KEY-OR-URL…]
+       echo ISSUE-KEY-OR-URL | ${0##*/} [-f FORMAT] [-o OUTPUT]
 
-Read JIRA issue keys or URLs from stdin, fetch their titles via the
-JIRA API, and emit formatted links.
+Fetch JIRA issue titles and emit formatted links.
 
 Options:
   -f, --format FORMAT   Output format
@@ -51,7 +51,7 @@ Defaults (auto-detected):
   other   --format markdown  --output tmux (in tmux) or stdout
 
 Input:
-  One issue key or URL per line on stdin.
+  Pass issue keys or URLs as arguments, or pipe them one per line on stdin.
   Bare keys (ECO-123) and full URLs (https://…/browse/ECO-123) are both accepted.
   Multiple entries produce a bulleted list.
 
@@ -78,6 +78,7 @@ extract_issue_key() {
 # ---------------------------------------------------------------------------
 _FORMAT=""
 _OUTPUT=""
+_ARGS=()
 configure() {
   # Defaults (auto-detected from platform and environment)
   if [[ "$(uname)" == Darwin ]]; then
@@ -105,6 +106,7 @@ configure() {
       *) fatal "Unknown option: $1" ;;
     esac
   done
+  _ARGS=("$@")
 
   case "$_FORMAT" in
     markdown|richtext|plain-text) ;;
@@ -144,9 +146,16 @@ process_entries() {
     printf '%s: %s → %s\n' "${0##*/}" "$_FORMAT" "$_OUTPUT" >&2
   fi
 
-  local _input _issue_key _json _title _url
-  while IFS= read -r _input; do
-    [[ -z "$_input" ]] && continue
+  local _input _issue_key _json _title _url _inputs=()
+  if (( ${#_ARGS[@]} > 0 )); then
+    _inputs=("${_ARGS[@]}")
+  else
+    while IFS= read -r _input; do
+      [[ -n "$_input" ]] && _inputs+=("$_input")
+    done
+  fi
+
+  for _input in "${_inputs[@]}"; do
     _issue_key=$(extract_issue_key "$_input")
     _json=$(JIRA_API_TOKEN="$JIRA_API_TOKEN" jira issue view "$_issue_key" --raw)
     _title=$(jq -r '.fields.summary' <<< "$_json")
