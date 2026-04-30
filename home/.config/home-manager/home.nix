@@ -78,6 +78,7 @@
     imagemagick
     inetutils
     isort
+    jira-cli-go
     jq
     kubectl
     kubectx

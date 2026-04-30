@@ -1,0 +1,282 @@
+#! /usr/bin/env bash
+
+set -o pipefail
+set -o errexit
+set -o nounset
+
+PASSWORD_STORE_KEY=${PASSWORD_STORE_KEY:-vortex.offline.n0p/pfh/outnordic/app/jira-cli}
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+_EMDASH=$'\xe2\x80\x94'  # U+2014
+_SEPARATOR=" $_EMDASH "
+
+html_escape() {
+  local _string="$1"
+  _string="${_string//&/&amp;}"
+  _string="${_string//</&lt;}"
+  _string="${_string//>/&gt;}"
+  _string="${_string//\"/&quot;}"
+  _string="${_string//\'/&#39;}"
+  printf '%s' "$_string"
+}
+
+fatal() {
+  echo "FATAL - $*" >&2
+  exit 1
+}
+
+usage() {
+  cat <<EOF
+Usage: ${0##*/} [-f FORMAT] [-o OUTPUT] [ISSUE-KEY-OR-URL…]
+       echo ISSUE-KEY-OR-URL | ${0##*/} [-f FORMAT] [-o OUTPUT]
+
+Fetch JIRA issue titles and emit formatted links.
+
+Options:
+  -f, --format FORMAT   Output format
+                          markdown    Markdown hyperlink
+                          richtext    RTF hyperlink (macOS only)
+                          plain-text  Plain text with URL in parentheses
+  -o, --output OUTPUT   Output destination
+                          pasteboard  macOS pasteboard — RTF + plain text (macOS only)
+                          pbcopy      pbcopy (macOS)
+                          tmux        tmux load-buffer
+                          stdout      Standard output
+  -h, --help            Show this help and exit
+
+Defaults (auto-detected):
+  macOS   --format richtext  --output pasteboard
+  other   --format markdown  --output tmux (in tmux) or stdout
+
+Input:
+  Pass issue keys or URLs as arguments, or pipe them one per line on stdin.
+  Bare keys (ECO-123) and full URLs (https://…/browse/ECO-123) are both accepted.
+  Multiple entries produce a bulleted list.
+
+Environment:
+  JIRA_API_TOKEN      API token. If unset, retrieved from pass(1).
+  PASSWORD_STORE_KEY  pass(1) path for the token.
+                      Default: $PASSWORD_STORE_KEY
+EOF
+}
+
+extract_issue_key() {
+  local _raw="$1"
+  if [[ "$_raw" == *"/"* ]]; then
+    _raw="${_raw##*/}"    # strip up to last /
+    _raw="${_raw%%\?*}"   # strip ?query-string
+    _raw="${_raw%%#*}"    # strip #fragment
+  fi
+  printf '%s' "$_raw"
+}
+
+validate_issue_key() {
+  [[ "$1" =~ ^[A-Z]+-[0-9]+$ ]] \
+    || fatal "Invalid issue key: '$1'"
+}
+
+print_status() {
+  if [[ -t 2 ]]; then
+    printf '\033[1m%s\033[0m: \033[36m%s\033[0m → \033[36m%s\033[0m\n' \
+      "${0##*/}" "$_FORMAT" "$_OUTPUT" >&2
+  else
+    printf '%s: %s → %s\n' "${0##*/}" "$_FORMAT" "$_OUTPUT" >&2
+  fi
+}
+
+
+# ---------------------------------------------------------------------------
+# Argument parsing and configuration
+# ---------------------------------------------------------------------------
+_FORMAT=""
+_OUTPUT=""
+_ARGS=()
+configure() {
+  # Defaults (auto-detected from platform and environment)
+  if [[ "$(uname)" == Darwin ]]; then
+    _FORMAT=richtext
+    _OUTPUT=pasteboard
+  else
+    _FORMAT=markdown
+    if [[ -n "${TMUX:-}" ]]; then
+      _OUTPUT=tmux
+    else
+      _OUTPUT=stdout
+    fi
+  fi
+
+  # Argument parsing (GNU getopt — long options)
+  # GNU getopt signals availability by exiting 4; capture without triggering errexit
+  local _getopt_rc=0; getopt --test > /dev/null 2>&1 || _getopt_rc=$?
+  (( _getopt_rc == 4 )) \
+    || fatal "GNU getopt required (BSD getopt detected)."
+
+  local _opts
+  _opts=$(getopt -o hf:o: --long help,format:,output: -n "${0##*/}" -- "$@")
+  eval set -- "$_opts"
+  while true; do
+    case "$1" in
+      -h|--help)   usage; exit 0 ;;
+      -f|--format) _FORMAT="$2"; shift 2 ;;
+      -o|--output) _OUTPUT="$2"; shift 2 ;;
+      --) shift; break ;;
+      *) fatal "Unknown option: $1" ;;
+    esac
+  done
+  _ARGS=("$@")
+
+  case "$_FORMAT" in
+    markdown|richtext|plain-text) ;;
+    *) fatal "Invalid --format '$_FORMAT'. Use: markdown, richtext, plain-text" ;;
+  esac
+
+  case "$_OUTPUT" in
+    pbcopy|tmux|stdout|pasteboard) ;;
+    *) fatal "Invalid --output '$_OUTPUT'. Use: pbcopy, tmux, stdout, pasteboard" ;;
+  esac
+
+  [[ "$_OUTPUT" == pasteboard && "$(uname)" != Darwin ]] \
+    && fatal "--output pasteboard is only supported on macOS"
+
+  # Credentials
+  if [[ -z "${JIRA_API_TOKEN:-}" ]]; then
+    JIRA_API_TOKEN=$(pass show "$PASSWORD_STORE_KEY" 2>/dev/null) \
+      || fatal "Failed to retrieve JIRA API token from password store at '$PASSWORD_STORE_KEY'"
+  fi
+}
+
+
+# ---------------------------------------------------------------------------
+# Entry data
+# ---------------------------------------------------------------------------
+_ENTRY_KEYS=()
+_ENTRY_TITLES=()
+_ENTRY_URLS=()
+
+fetch_entries() {
+  local _input _issue_key _json _title _url _inputs=()
+  if (( ${#_ARGS[@]} > 0 )); then
+    _inputs=("${_ARGS[@]}")
+  else
+    [[ -t 0 ]] \
+      && fatal "No issue keys given. Pass as arguments or pipe via stdin."
+
+    while IFS= read -r _input; do
+      [[ -n "$_input" ]] && _inputs+=("$_input")
+    done
+  fi
+
+  for _input in "${_inputs[@]}"; do
+    _issue_key=$(extract_issue_key "$_input")
+    validate_issue_key "$_issue_key"
+    # FIXME: token passed via env var is briefly readable from /proc/<pid>/environ on Linux
+    _json=$(JIRA_API_TOKEN="$JIRA_API_TOKEN" jira issue view "$_issue_key" --raw)
+    _title=$(jq -r '.fields.summary' <<< "$_json")
+    _url=$(jq -r '(.self | split("/")[:3] | join("/")) + "/browse/" + .key' <<< "$_json")
+    _ENTRY_KEYS+=("$_issue_key")
+    _ENTRY_TITLES+=("$_title")
+    _ENTRY_URLS+=("$_url")
+  done
+}
+
+
+# ---------------------------------------------------------------------------
+# Formatters
+# ---------------------------------------------------------------------------
+format_plain_text() {
+  local _out="" _prefix="" _i=""
+  (( ${#_ENTRY_KEYS[@]} > 1 )) \
+    && _prefix=$'\xe2\x80\xa2'" "  # U+2022 bullet
+
+  for _i in "${!_ENTRY_KEYS[@]}"; do
+    _out+="${_prefix}${_ENTRY_KEYS[$_i]}${_SEPARATOR}${_ENTRY_TITLES[$_i]} (${_ENTRY_URLS[$_i]})"$'\n'
+  done
+  printf '%s' "${_out%$'\n'}"
+}
+
+format_markdown() {
+  local _out="" _prefix="" _i=""
+  (( ${#_ENTRY_KEYS[@]} > 1 )) \
+    && _prefix="- "
+
+  for _i in "${!_ENTRY_KEYS[@]}"; do
+    _out+="${_prefix}[${_ENTRY_KEYS[$_i]}${_SEPARATOR}${_ENTRY_TITLES[$_i]}](${_ENTRY_URLS[$_i]})"$'\n'
+  done
+  printf '%s' "${_out%$'\n'}"
+}
+
+format_richtext() {
+  local _html_body _separator
+  _separator=$(html_escape "$_SEPARATOR")
+
+  if (( ${#_ENTRY_KEYS[@]} == 1 )); then
+    local _ek _et _eu
+    _ek=$(html_escape "${_ENTRY_KEYS[0]}")
+    _et=$(html_escape "${_ENTRY_TITLES[0]}")
+    _eu=$(html_escape "${_ENTRY_URLS[0]}")
+    _html_body="<p><a href=\"${_eu}\">${_ek}${_separator}${_et}</a></p>"
+  else
+    local _i _ek _et _eu
+    _html_body="<ul>"$'\n'
+    for _i in "${!_ENTRY_KEYS[@]}"; do
+      _ek=$(html_escape "${_ENTRY_KEYS[$_i]}")
+      _et=$(html_escape "${_ENTRY_TITLES[$_i]}")
+      _eu=$(html_escape "${_ENTRY_URLS[$_i]}")
+      _html_body+="<li><a href=\"${_eu}\">${_ek}${_separator}${_et}</a></li>"$'\n'
+    done
+    _html_body+="</ul>"
+  fi
+
+  printf '<html><head><meta charset="UTF-8"></head><body>%s</body></html>' "$_html_body" \
+    | textutil -convert rtf -format html -stdin -stdout
+}
+
+
+# ---------------------------------------------------------------------------
+# Outputters
+# ---------------------------------------------------------------------------
+_output_pasteboard() {
+  local _rtf="$1" _plain="$2"
+  osascript -l JavaScript - "$_rtf" "$_plain" <<'JXA'
+    ObjC.import("AppKit");
+    function run(argv) {
+      var pb = $.NSPasteboard.generalPasteboard;
+      pb.clearContents;
+      var data = $.NSString.alloc.initWithUTF8String(argv[0])
+                   .dataUsingEncoding($.NSUTF8StringEncoding);
+      pb.setDataForType(data, $.NSPasteboardTypeRTF);
+      pb.setStringForType($(argv[1]), $.NSPasteboardTypeString);
+    }
+JXA
+}
+
+output() {
+  local _text="$1" _rtf="${2:-}"
+  local _content="${_rtf:-$_text}"
+  case "$_OUTPUT" in
+    stdout)     printf '%s\n' "$_content" ;;
+    pbcopy)     printf '%s' "$_content" | pbcopy ;;
+    tmux)       printf '%s' "$_content" | tmux load-buffer -w - ;;
+    pasteboard) _output_pasteboard "$_rtf" "$_text" ;;
+  esac
+}
+
+emit() {
+  case "$_FORMAT" in
+    plain-text)  output "$(format_plain_text)" ;;
+    markdown)    output "$(format_markdown)" ;;
+    richtext)    output "$(format_plain_text)" "$(format_richtext)" ;;
+  esac
+}
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+configure "$@"
+print_status
+fetch_entries
+emit
