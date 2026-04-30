@@ -36,9 +36,10 @@ Run Claude Code under a named account with an isolated config directory.
 
 Commands:
   <account> [CLAUDE_ARGS...]   Run claude with the given account's config
-  --init, -i <account>         Create account directory and run initial auth
-  --list, -l                   List configured accounts
-  --help, -h                   Show this help and exit
+  --init,  -i <account>        Create account directory and run initial auth
+  --setup, -s <account>        Apply/refresh default settings on an existing account
+  --list,  -l                  List configured accounts
+  --help,  -h                  Show this help and exit
 
 Symlink usage (preferred):
   ln -s claude-account ~/.local/bin/claude-outnordic
@@ -80,6 +81,10 @@ configure() {
       _COMMAND=init
       _ACCOUNT="${2:-}"
       [[ -n "$_ACCOUNT" ]] || fatal "--init requires an account name" ;;
+    -s|--setup)
+      _COMMAND=setup
+      _ACCOUNT="${2:-}"
+      [[ -n "$_ACCOUNT" ]] || fatal "--setup requires an account name" ;;
     "")
       usage; exit 1 ;;
     -*)
@@ -114,17 +119,29 @@ setup_settings() {
   local _account_dir="$1"
   local _settings="$_account_dir/settings.json"
   local _status_cmd="${HOME}/.local/bin/claude-status"
-  local _status_entry
-  _status_entry=$(printf '{"statusLine":{"type":"command","command":"%s"}}' "$_status_cmd")
+  local _defaults
+  _defaults=$(printf '{
+  "editorMode": "vim",
+  "theme": "auto",
+  "statusLine": {"type": "command", "command": "%s"}
+}' "$_status_cmd")
 
   if [[ -f "$_settings" ]]; then
     local _tmp
-    _tmp=$(jq --argjson s "$_status_entry" '. + $s' "$_settings") \
+    _tmp=$(jq --argjson d "$_defaults" '. + $d' "$_settings") \
       || return
     printf '%s\n' "$_tmp" > "$_settings"
   else
-    printf '%s\n' "$_status_entry" > "$_settings"
+    printf '%s\n' "$_defaults" > "$_settings"
   fi
+}
+
+cmd_setup() {
+  local _account_dir="$_ACCOUNTS_DIR/$_ACCOUNT"
+  [[ -d "$_account_dir" ]] \
+    || fatal "Account '$_ACCOUNT' not found at $_account_dir. Run: ${0##*/} --init '$_ACCOUNT'"
+  setup_settings "$_account_dir"
+  echo "Settings updated: $_account_dir/settings.json" >&2
 }
 
 cmd_init() {
@@ -155,7 +172,8 @@ cmd_run() {
 configure "$@"
 
 case "$_COMMAND" in
-  list) cmd_list ;;
-  init) cmd_init ;;
-  run)  cmd_run ;;
+  list)  cmd_list ;;
+  init)  cmd_init ;;
+  setup) cmd_setup ;;
+  run)   cmd_run ;;
 esac
