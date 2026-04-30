@@ -4,7 +4,7 @@ set -o pipefail
 set -o errexit
 set -o nounset
 
-_CLAUDE_BIN="${CLAUDE_BIN:-/Users/pfh/.local/bin/claude}"
+_CLAUDE_BIN="${CLAUDE_BIN:-${HOME}/.local/bin/claude}"
 _ACCOUNTS_DIR="${CLAUDE_ACCOUNTS_DIR:-${HOME}/.claude-accounts}"
 
 

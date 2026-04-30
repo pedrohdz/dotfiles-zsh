@@ -41,6 +41,7 @@ effort_colored() {
 
 usage_bar() {
   local _pct="${1:-0}" _width=8
+  _pct="${_pct%.*}"
   local _filled=$(( (_pct * _width + 50) / 100 ))
   local _bar="" _i
 
