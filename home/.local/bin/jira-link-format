@@ -86,7 +86,8 @@ configure() {
 # ---------------------------------------------------------------------------
 # Input processing
 # ---------------------------------------------------------------------------
-# Read URLs from stdin; store keys, titles, urls in parallel arrays
+# Read issue keys or URLs from stdin; store keys, titles, urls in parallel
+# arrays
 _ENTRY_KEYS=()
 _ENTRY_TITLES=()
 _ENTRY_URLS=()
@@ -122,19 +123,23 @@ process_entries() {
 # Formatters
 # ---------------------------------------------------------------------------
 format_plain_text() {
-  local _out="" _prefix=""
-  (( ${#_ENTRY_KEYS[@]} > 1 )) && _prefix=$'\xe2\x80\xa2'" "  # U+2022 bullet
-  for i in "${!_ENTRY_KEYS[@]}"; do
-    _out+="${_prefix}${_ENTRY_KEYS[$i]}${_SEPARATOR}${_ENTRY_TITLES[$i]} (${_ENTRY_URLS[$i]})"$'\n'
+  local _out="" _prefix="" _i=""
+  (( ${#_ENTRY_KEYS[@]} > 1 )) \
+    && _prefix=$'\xe2\x80\xa2'" "  # U+2022 bullet
+
+  for _i in "${!_ENTRY_KEYS[@]}"; do
+    _out+="${_prefix}${_ENTRY_KEYS[$_i]}${_SEPARATOR}${_ENTRY_TITLES[$_i]} (${_ENTRY_URLS[$_i]})"$'\n'
   done
   printf '%s' "${_out%$'\n'}"
 }
 
 format_markdown() {
-  local _out="" _prefix=""
-  (( ${#_ENTRY_KEYS[@]} > 1 )) && _prefix="- "
-  for i in "${!_ENTRY_KEYS[@]}"; do
-    _out+="${_prefix}[${_ENTRY_KEYS[$i]}${_SEPARATOR}${_ENTRY_TITLES[$i]}](${_ENTRY_URLS[$i]})"$'\n'
+  local _out="" _prefix="" _i=""
+  (( ${#_ENTRY_KEYS[@]} > 1 )) \
+    && _prefix="- "
+
+  for _i in "${!_ENTRY_KEYS[@]}"; do
+    _out+="${_prefix}[${_ENTRY_KEYS[$_i]}${_SEPARATOR}${_ENTRY_TITLES[$_i]}](${_ENTRY_URLS[$_i]})"$'\n'
   done
   printf '%s' "${_out%$'\n'}"
 }
