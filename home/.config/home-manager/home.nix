@@ -88,6 +88,7 @@
     lima
     minicom
     mtools
+    ncurses
     neovim
     nmap
     nodejs
@@ -265,4 +266,9 @@
 
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
+
+  home.activation.installWeztermTerminfo = config.lib.dag.entryAfter ["writeBoundary"] ''
+    run ${pkgs.ncurses}/bin/tic -x -o "$HOME/.terminfo" \
+      ${./files/wezterm.terminfo}
+  '';
 }
