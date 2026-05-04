@@ -1,6 +1,15 @@
 local wezterm = require 'wezterm'
 local config = wezterm.config_builder()
 
+-- Use the official WezTerm terminfo instead of the default xterm-256color.
+-- Requires the terminfo to be installed via home-manager (see
+-- home/.config/home-manager/files/README.md). The ncurses-bundled wezterm
+-- entry must NOT be used — it lacks extended capabilities (RGB truecolor,
+-- correct key sequences, etc.) and causes broken colors and garbled input.
+--   https://wezterm.org/config/lua/config/term.html
+config.term = 'wezterm'
+
+
 -- config.font = wezterm.font('JetBrains Mono')
 config.font_rules = {
   {
@@ -36,16 +45,16 @@ config.window_padding = {
   bottom = 2,
 }
 
--- Setting `enable_csi_u_key_encoding` in hopes of fixing the `CSU U` issue
--- with NeoVim.  The hope is to allow native support for function keys with
--- modifiers (i.e. `<S-F1>`).
---   - https://neovim.io/doc/user/term.html#tui-input
---
--- > It  is not recommended to enable this option as it does change the
--- > behavior of some keys in backwards incompatible ways and there isn't a way
--- > for applications to detect or request this behavior.gq
---   - https://wezfurlong.org/wezterm/config/lua/config/enable_csi_u_key_encoding.html
-config.enable_csi_u_key_encoding = true
+-- -- Setting `enable_csi_u_key_encoding` in hopes of fixing the `CSU U` issue
+-- -- with NeoVim.  The hope is to allow native support for function keys with
+-- -- modifiers (i.e. `<S-F1>`).
+-- --   - https://neovim.io/doc/user/term.html#tui-input
+-- --
+-- -- > It  is not recommended to enable this option as it does change the
+-- -- > behavior of some keys in backwards incompatible ways and there isn't a way
+-- -- > for applications to detect or request this behavior.gq
+-- --   - https://wezfurlong.org/wezterm/config/lua/config/enable_csi_u_key_encoding.html
+-- config.enable_csi_u_key_encoding = true
 
 require('pedrohdz.key_bindings').apply(config)
 require('pedrohdz.mouse_bindings').apply(config)
