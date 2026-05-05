@@ -9,6 +9,18 @@ echo "COLORTERM    = $COLORTERM"
 echo "TERM_PROGRAM = $TERM_PROGRAM"
 
 #------------------------------------------------------------------------------
+# Handle terminal vars over SSH
+#------------------------------------------------------------------------------
+export LC_TERMINAL=${LC_TERMINAL:-$TERM_PROGRAM}
+export LC_TERMINAL_VERSION=${LC_TERMINAL_VERSION:-$TERM_PROGRAM_VERSION}
+export LC_COLORTERM=${LC_COLORTERM:-$COLORTERM}
+
+export TERM_PROGRAM=${TERM_PROGRAM:-$LC_TERMINAL}
+export TERM_PROGRAM_VERSION=${TERM_PROGRAM_VERSION:-$LC_TERMINAL_VERSION}
+export COLORTERM=${COLORTERM:-$LC_COLORTERM}
+
+
+#------------------------------------------------------------------------------
 # WezTerm
 #------------------------------------------------------------------------------
 # https://wezterm.org/config/lua/config/term.html
