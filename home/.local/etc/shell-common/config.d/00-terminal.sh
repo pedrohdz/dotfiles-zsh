@@ -8,17 +8,16 @@ fi
 #------------------------------------------------------------------------------
 # Handle terminal vars over SSH
 #------------------------------------------------------------------------------
-# Sync TERM_PROGRAM/COLORTERM into LC_* so SendEnv LC_* passes them over SSH
-# (servers commonly accept LC_* but not arbitrary env vars). On the remote end
-# the reverse sync restores TERM_PROGRAM/COLORTERM from whatever arrived. See:
-#   - ~/.ssh/configs/common.sshconfig
-export LC_TERMINAL=${LC_TERMINAL:-$TERM_PROGRAM}
-export LC_TERMINAL_VERSION=${LC_TERMINAL_VERSION:-$TERM_PROGRAM_VERSION}
-export LC_COLORTERM=${LC_COLORTERM:-$COLORTERM}
+# Sync TERM_PROGRAM/COLORTERM ↔ LC__* for SSH passthrough — LC_* is widely
+# accepted via AcceptEnv where arbitrary vars are not. See:
+#   ~/.ssh/configs/common.sshconfig
+export LC__TERMINAL=${LC__TERMINAL:-$TERM_PROGRAM}
+export LC__TERMINAL_VERSION=${LC__TERMINAL_VERSION:-$TERM_PROGRAM_VERSION}
+export LC__COLORTERM=${LC__COLORTERM:-$COLORTERM}
 
-export TERM_PROGRAM=${TERM_PROGRAM:-$LC_TERMINAL}
-export TERM_PROGRAM_VERSION=${TERM_PROGRAM_VERSION:-$LC_TERMINAL_VERSION}
-export COLORTERM=${COLORTERM:-$LC_COLORTERM}
+export TERM_PROGRAM=${TERM_PROGRAM:-$LC__TERMINAL}
+export TERM_PROGRAM_VERSION=${TERM_PROGRAM_VERSION:-$LC__TERMINAL_VERSION}
+export COLORTERM=${COLORTERM:-$LC__COLORTERM}
 
 
 #------------------------------------------------------------------------------
