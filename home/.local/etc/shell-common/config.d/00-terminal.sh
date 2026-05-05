@@ -4,13 +4,14 @@ if [[ ! (-o interactive || $- == *i*) ]]; then
   return 0
 fi
 
-echo "TERM         = $TERM"
-echo "COLORTERM    = $COLORTERM"
-echo "TERM_PROGRAM = $TERM_PROGRAM"
 
 #------------------------------------------------------------------------------
 # Handle terminal vars over SSH
 #------------------------------------------------------------------------------
+# Sync TERM_PROGRAM/COLORTERM into LC_* so SendEnv LC_* passes them over SSH
+# (servers commonly accept LC_* but not arbitrary env vars). On the remote end
+# the reverse sync restores TERM_PROGRAM/COLORTERM from whatever arrived. See:
+#   - ~/.ssh/configs/common.sshconfig
 export LC_TERMINAL=${LC_TERMINAL:-$TERM_PROGRAM}
 export LC_TERMINAL_VERSION=${LC_TERMINAL_VERSION:-$TERM_PROGRAM_VERSION}
 export LC_COLORTERM=${LC_COLORTERM:-$COLORTERM}
