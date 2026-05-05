@@ -4,27 +4,58 @@ if [[ ! (-o interactive || $- == *i*) ]]; then
   return 0
 fi
 
-# If TERM=wezterm but the official terminfo is not installed, fall back to
-# xterm-256color so the shell stays usable until `home-manager switch` is run.
-# The ncurses-bundled wezterm entry lacks extended capabilities and causes
-# broken colors and garbled input.
-#   https://wezterm.org/config/lua/config/term.html
-if [[ "$TERM" == "wezterm" ]] && ! infocmp wezterm &>/dev/null; then
-  export TERM=xterm-256color
+
+#------------------------------------------------------------------------------
+# Handle terminal vars over SSH
+#------------------------------------------------------------------------------
+# Sync TERM_PROGRAM/COLORTERM into LC_* so SendEnv LC_* passes them over SSH
+# (servers commonly accept LC_* but not arbitrary env vars). On the remote end
+# the reverse sync restores TERM_PROGRAM/COLORTERM from whatever arrived. See:
+#   - ~/.ssh/configs/common.sshconfig
+export LC_TERMINAL=${LC_TERMINAL:-$TERM_PROGRAM}
+export LC_TERMINAL_VERSION=${LC_TERMINAL_VERSION:-$TERM_PROGRAM_VERSION}
+export LC_COLORTERM=${LC_COLORTERM:-$COLORTERM}
+
+export TERM_PROGRAM=${TERM_PROGRAM:-$LC_TERMINAL}
+export TERM_PROGRAM_VERSION=${TERM_PROGRAM_VERSION:-$LC_TERMINAL_VERSION}
+export COLORTERM=${COLORTERM:-$LC_COLORTERM}
+
+
+#------------------------------------------------------------------------------
+# WezTerm
+#------------------------------------------------------------------------------
+# https://wezterm.org/config/lua/config/term.html
+if [[ "$TERM" == "wezterm" ]]; then
+  export COLORTERM=truecolor
+  if infocmp wezterm &>/dev/null; then
+    :
+  elif infocmp xterm-direct &>/dev/null; then
+    export TERM=xterm-direct
+  elif infocmp xterm-256color &>/dev/null; then
+    export TERM=xterm-256color
+  fi
+  return
 fi
 
-# Set COLORTERM=truecolor if the terminal supports it and has not already
-# declared it.  tmux/screen are skipped — tmux-256color carries truecolor
-# support via the Tc terminfo capability rather than COLORTERM.
-if [[ -z "$COLORTERM" ]]; then
-  case "$TERM" in
-    wezterm|*-direct)
-      export COLORTERM=truecolor ;;
-    tmux*|screen*)
-      : ;;
-    *)
-      case "${TERM_PROGRAM-}" in
-        WezTerm|iTerm.app) export COLORTERM=truecolor ;;
-      esac ;;
-  esac
+
+#------------------------------------------------------------------------------
+# Truecolor check for all else
+#------------------------------------------------------------------------------
+if [[ -n "$COLORTERM" ]]; then
+  return
 fi
+
+case "$TERM" in
+  *-direct)
+    export COLORTERM=truecolor ;;
+  tmux*|screen*)
+    :
+    ;;
+  *)
+    case "${TERM_PROGRAM-}" in
+      iTerm.app|vscode)
+        export COLORTERM=truecolor
+        ;;
+    esac
+    ;;
+esac
