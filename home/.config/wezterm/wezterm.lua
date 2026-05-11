@@ -45,6 +45,13 @@ config.window_padding = {
   bottom = 2,
 }
 
+-- Kitty keyboard protocol — enables Shift+Enter to insert a newline (not submit)
+-- in Claude Code and other apps that support it. Sends \e[13;2u for Shift+Enter
+-- instead of \e[27;5;106~ (Ctrl+J), which Claude Code does not recognize.
+--   https://wezterm.org/config/lua/config/enable_kitty_keyboard.html
+--   https://www.reddit.com/r/wezterm/comments/1qwxs3k/wezterm_with_claude_code_shiftenter_for_line/
+config.enable_kitty_keyboard = true
+
 -- -- Setting `enable_csi_u_key_encoding` in hopes of fixing the `CSU U` issue
 -- -- with NeoVim.  The hope is to allow native support for function keys with
 -- -- modifiers (i.e. `<S-F1>`).

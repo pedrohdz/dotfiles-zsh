@@ -28,6 +28,24 @@ function _M.apply(config)
 
     -- Clipboard
     { key = 'v',          mods = 'CMD',       action = action.PasteFrom 'Clipboard' },
+
+    -- Shift+Enter → insert newline in Claude Code (NOT submit).
+    --
+    -- Sends \e[27;2;13~ (XTerm modifyOtherKeys format: modifier=2=Shift, key=13=CR).
+    -- Claude Code recognizes this sequence and inserts a newline instead of submitting.
+    --
+    -- PROBLEM: this only works when NOT inside tmux. With tmux, the sequence arrives at
+    -- tmux's outer PTY, but tmux re-encodes or swallows it — the inner pane (Claude Code)
+    -- never receives it. The kitty keyboard protocol approach (fullkbd + extended-keys on
+    -- in tmux.conf) is the correct fix, but is still unresolved as of 2026-05-11.
+    --
+    -- NOTE: WezTerm keybindings do NOT suppress native protocol-mode encoding. When
+    -- modifyOtherKeys is active (zsh requests it via \e[>4;2m), WezTerm sends BOTH
+    -- this keybinding string AND its native \e[27;5;106~ (Ctrl+J) encoding — double-send.
+    -- Only safe to re-enable if modifyOtherKeys is disabled or if the fullkbd approach
+    -- is confirmed broken.
+    --
+    -- { key = 'Enter', mods = 'SHIFT', action = action.SendString('\x1b[27;2;13~') },
   }
 end
 
