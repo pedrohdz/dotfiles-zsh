@@ -152,6 +152,7 @@
 
     # LLMs
     claude-code
+    aider-chat
 
     # Linters & code analysis
     ansible-lint
@@ -186,7 +187,6 @@
     # Linux only packages
     # ----
     (lib.optionals pkgs.stdenv.isLinux [
-      aider-chat
       helm
       kbd
       netcat-openbsd
@@ -202,7 +202,7 @@
     # MacOS only packages
     # ----
     (lib.optionals pkgs.stdenv.isDarwin [
-      aider-chat
+      obsidian
       wezterm
     ])
 
