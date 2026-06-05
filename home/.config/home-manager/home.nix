@@ -100,15 +100,15 @@
     proxychains-ng
     pv
     pwgen
-    python313Packages.flake8
-    python313Packages.netaddr
-    python313Packages.pipdeptree
-    python313Packages.pygments
-    python313Packages.pylint
-    python313Packages.sqlparse
-    python313Packages.tabulate
-    python313Packages.tox
     python314
+    python314Packages.flake8
+    python314Packages.netaddr
+    python314Packages.pipdeptree
+    python314Packages.pygments
+    python314Packages.pylint
+    python314Packages.sqlparse
+    python314Packages.tabulate
+    python314Packages.tox
     qrencode
     ripgrep
     scrypt
