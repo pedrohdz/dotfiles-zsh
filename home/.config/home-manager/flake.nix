@@ -46,6 +46,22 @@
           };
         };
 
+        lima-dev-vm-new = {
+          system = "aarch64-linux";
+          users = {
+            pedro = "/home/pedro";
+            tester = "/home/tester";
+          };
+        };
+
+        lima-dev-vm-old = {
+          system = "aarch64-linux";
+          users = {
+            pedro = "/home/pedro";
+            tester = "/home/tester";
+          };
+        };
+
         lima-dev-test = {
           system = "aarch64-linux";
           users = {
