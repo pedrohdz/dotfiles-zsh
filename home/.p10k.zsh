@@ -51,6 +51,7 @@
   # last prompt line gets hidden if it would overlap with left prompt.
   typeset -g POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(
     # =========================[ Line #0 ]=========================
+    vi_mode                 # vi mode (you don't need this if you've enabled prompt_char)
     background_jobs         # presence of background jobs
     aws                     # aws profile (https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html)
     kubecontext             # current kubernetes context (https://kubernetes.io/)
@@ -58,7 +59,7 @@
     azure                   # azure account name (https://docs.microsoft.com/en-us/cli/azure)
     pyenv                   # python environment (https://github.com/pyenv/pyenv)
     virtualenv              # python virtual environment (https://docs.python.org/3/library/venv.html)
-    vi_mode                 # vi mode (you don't need this if you've enabled prompt_char)
+    git_repo_name           # git repo name with icon
     nix_shell               # nix shell (https://nixos.org/nixos/nix-pills/developing-with-nix-shell.html)
     command_execution_time  # duration of the last command
     newline                 # \n
@@ -1581,6 +1582,34 @@
   typeset -g POWERLEVEL9K_TIME_VISUAL_IDENTIFIER_EXPANSION=''
   # Custom prefix.
   # typeset -g POWERLEVEL9K_TIME_PREFIX='%246Fat '
+
+  # Custom segment: git repo name with git icon. Only shown when inside a git repo.
+  # Works for regular clones, bare repos, and .bare-convention worktree setups.
+  function prompt_git_repo_name() {
+    local git_common_dir
+    git_common_dir=$(git rev-parse --git-common-dir 2>/dev/null) || return
+
+    # --git-common-dir may return a relative path for regular repos; make it absolute.
+    if [[ "$git_common_dir" != /* ]]; then
+      git_common_dir=$(git rev-parse --absolute-git-dir 2>/dev/null) || return
+    fi
+
+    local repo_name
+    if [[ "${git_common_dir:t}" == .* ]]; then
+      # Hidden dir (.git, .bare, etc.): it lives inside the real project dir
+      repo_name="${git_common_dir:h:t}"
+    else
+      # Top-level bare repo (e.g. outnordic-ecommerce-platform.git)
+      repo_name="${git_common_dir:t}"
+    fi
+
+    local git_icon=$''
+    p10k segment -f 202 -i "$git_icon" -t "$repo_name"
+  }
+
+  function instant_prompt_git_repo_name() {
+    prompt_git_repo_name
+  }
 
   # Example of a user-defined prompt segment. Function prompt_example will be called on every
   # prompt if `example` prompt segment is added to POWERLEVEL9K_LEFT_PROMPT_ELEMENTS or
