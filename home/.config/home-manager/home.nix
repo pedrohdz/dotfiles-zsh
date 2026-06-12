@@ -302,7 +302,7 @@ in {
     # default runtimepath and neovim scans parser/ subdirs for <lang>.so files.
     ".local/share/nvim/site/parser" = {
       source = "${nvimParsers}/parser";
-      force = true;
+      recursive = true;
     };
   };
 
