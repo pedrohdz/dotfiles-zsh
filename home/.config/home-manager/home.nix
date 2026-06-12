@@ -1,6 +1,58 @@
-{ config, pkgs, username, homeDirectory, ... }:
+{ config, pkgs, lib, username, homeDirectory, ... }:
 
-{
+let
+  treesitterGrammars = with pkgs.tree-sitter-grammars; [
+    tree-sitter-bash
+    tree-sitter-c
+    tree-sitter-cpp
+    tree-sitter-css
+    tree-sitter-csv
+    tree-sitter-dockerfile
+    tree-sitter-dot
+    tree-sitter-git-config    # → git_config
+    tree-sitter-git-rebase    # → git_rebase
+    tree-sitter-gitcommit
+    tree-sitter-gitignore
+    tree-sitter-go
+    tree-sitter-groovy
+    tree-sitter-hcl
+    tree-sitter-html
+    tree-sitter-java
+    tree-sitter-javascript
+    tree-sitter-json
+    tree-sitter-latex
+    tree-sitter-lua
+    tree-sitter-make
+    tree-sitter-markdown
+    tree-sitter-markdown-inline
+    tree-sitter-nix
+    tree-sitter-python
+    tree-sitter-regex
+    tree-sitter-rst
+    tree-sitter-rust
+    tree-sitter-toml
+    tree-sitter-tsx
+    tree-sitter-typescript
+    tree-sitter-vim
+    tree-sitter-yaml
+    # Not in nixpkgs 26.05: terraform, tmux, vimdoc
+  ];
+
+  nvimParsers = pkgs.runCommand "nvim-treesitter-parsers" { } (
+    "mkdir -p $out/parser\n" +
+    lib.concatMapStrings
+      (grammar:
+        let
+          lang = builtins.replaceStrings [ "-" ] [ "_" ]
+            (lib.removePrefix "tree-sitter-" grammar.pname);
+          ext = pkgs.stdenv.hostPlatform.extensions.sharedLibrary;
+        in
+          "cp ${grammar}/parser $out/parser/${lang}${ext}\n"
+      )
+      treesitterGrammars
+  );
+
+in {
   # Home Manager needs a bit of information about you and the paths it should
   # manage.
   home.username = username;
@@ -164,6 +216,8 @@
     # ----
     # NeoVim specific
     # ----
+    tree-sitter
+
     # NeoVim/Lazy - Lua
     lua51Packages.lua
     lua51Packages.luarocks
@@ -243,6 +297,13 @@
     #   org.gradle.console=verbose
     #   org.gradle.daemon.idletimeout=3600000
     # '';
+
+    # Pre-compiled tree-sitter parsers; ~/.local/share/nvim/site is on neovim's
+    # default runtimepath and neovim scans parser/ subdirs for <lang>.so files.
+    ".local/share/nvim/site/parser" = {
+      source = "${nvimParsers}/parser";
+      recursive = true;
+    };
   };
 
   # Home Manager can also manage your environment variables through
