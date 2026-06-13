@@ -168,7 +168,6 @@ in {
     ssh-audit
     sshpass
     stunnel
-    tenv
     thc-secure-delete
     time
     tmux
