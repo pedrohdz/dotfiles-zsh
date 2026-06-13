@@ -1,9 +1,11 @@
 { config, pkgs, lib, username, homeDirectory, ... }:
 
 let
+  # Neovim 0.12.2 bundles its own parsers compiled against its own queries. Installing
+  # nixpkgs versions of these causes query/parser version mismatches and errors on startup.
+  # Excluded (bundled by neovim): c, lua, markdown, markdown_inline, query, vim, vimdoc
   treesitterGrammars = with pkgs.tree-sitter-grammars; [
     tree-sitter-bash
-    tree-sitter-c
     tree-sitter-cpp
     tree-sitter-css
     tree-sitter-csv
@@ -21,10 +23,7 @@ let
     tree-sitter-javascript
     tree-sitter-json
     tree-sitter-latex
-    tree-sitter-lua
     tree-sitter-make
-    tree-sitter-markdown
-    tree-sitter-markdown-inline
     tree-sitter-nix
     tree-sitter-python
     tree-sitter-regex
@@ -33,7 +32,6 @@ let
     tree-sitter-toml
     tree-sitter-tsx
     tree-sitter-typescript
-    tree-sitter-vim
     tree-sitter-yaml
     # Not in nixpkgs 26.05: terraform, tmux, vimdoc
   ];
