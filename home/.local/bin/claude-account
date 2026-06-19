@@ -123,7 +123,48 @@ setup_settings() {
   _defaults=$(printf '{
   "editorMode": "vim",
   "theme": "auto",
-  "statusLine": {"type": "command", "command": "%s"}
+  "statusLine": {"type": "command", "command": "%s"},
+  "autoUpdatesChannel": "stable",
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "allowUnsandboxedCommands": true,
+    "filesystem": {
+      "denyRead": ["~"],
+      "allowRead": [
+        "~/.homesick",
+        "~/dev",
+        "~/tmp",
+        "~/.claude",
+        "~/.claude.json",
+        "~/.claude-accounts",
+        "~/.cargo",
+        "~/.rustup",
+        "~/.npm",
+        "~/.nuget",
+        "~/.dotnet",
+        "~/.nix-profile",
+        "~/.nix-defexpr",
+        "~/.local",
+        "~/.config/bat",
+        "~/.config/containers",
+        "~/.config/environment.d",
+        "~/.config/fd",
+        "~/.config/git",
+        "~/.config/home-manager",
+        "~/.config/nix",
+        "~/.config/nvim",
+        "~/.config/rg",
+        "~/.config/systemd",
+        "~/.config/tmux",
+        "~/.config/tmux-powerline",
+        "~/.config/wezterm"
+      ]
+    }
+  },
+  "permissions": {
+    "deny": ["Bash(git push*)"]
+  }
 }' "$_status_cmd")
 
   if [[ -f "$_settings" ]]; then
