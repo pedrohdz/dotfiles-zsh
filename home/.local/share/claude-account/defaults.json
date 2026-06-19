@@ -73,7 +73,9 @@
   },
   "permissions": {
     "deny": [
+      "Bash(ansible-playbook *)",
       "Bash(at *)",
+      "Bash(aws *)",
       "Bash(byobu *)",
       "Bash(crontab *)",
       "Bash(defaults *)",
@@ -103,6 +105,12 @@
       "Bash(sudo *)",
       "Bash(sudoedit *)",
       "Bash(system_profiler *)",
+      "Bash(terraform * apply*)",
+      "Bash(terraform apply*)",
+      "Bash(terraform * destroy*)",
+      "Bash(terraform destroy*)",
+      "Bash(terraform * force-unlock*)",
+      "Bash(terraform force-unlock*)",
       "Bash(tmux *)",
       "Bash(tmx *)",
       "Bash(wezterm *)",
@@ -112,7 +120,25 @@
       "Bash(wl-paste *)",
       "Bash(xclip *)",
       "Bash(xsel *)",
-      "Bash(zellij *)"
+      "Bash(zellij *)",
+      "Edit(~/.aws/**)",
+      "Edit(~/.config/gh/**)",
+      "Edit(~/.config/github-copilot/**)",
+      "Edit(~/.gnupg/**)",
+      "Edit(~/.password-store/**)",
+      "Edit(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.config/gh/**)",
+      "Read(~/.config/github-copilot/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.password-store/**)",
+      "Read(~/.ssh/**)",
+      "Write(~/.aws/**)",
+      "Write(~/.config/gh/**)",
+      "Write(~/.config/github-copilot/**)",
+      "Write(~/.gnupg/**)",
+      "Write(~/.password-store/**)",
+      "Write(~/.ssh/**)"
     ]
   }
 }
