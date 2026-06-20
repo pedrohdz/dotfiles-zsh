@@ -119,12 +119,9 @@ setup_settings() {
   local _account_dir="$1"
   local _settings="$_account_dir/settings.json"
   local _status_cmd="${HOME}/.local/bin/claude-status"
+  local _defaults_file="${HOME}/.local/share/claude-account/defaults.json"
   local _defaults
-  _defaults=$(printf '{
-  "editorMode": "vim",
-  "theme": "auto",
-  "statusLine": {"type": "command", "command": "%s"}
-}' "$_status_cmd")
+  _defaults=$(jq --arg cmd "$_status_cmd" '.statusLine.command = $cmd' "$_defaults_file")
 
   if [[ -f "$_settings" ]]; then
     local _tmp
