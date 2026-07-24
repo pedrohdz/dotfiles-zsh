@@ -17,4 +17,5 @@ git -C "$target_dir" fetch --all
 default_branch_ref=$(git -C "$target_dir" symbolic-ref HEAD)
 default_branch_name=${default_branch_ref##*/}
 
-git -C "$target_dir" worktree add "$default_branch_name" "$default_branch_name"
+git -C "$target_dir" worktree add "@${default_branch_name}" "$default_branch_name"
+git -C "$target_dir" branch --set-upstream-to="origin/$default_branch_name" "$default_branch_name"
