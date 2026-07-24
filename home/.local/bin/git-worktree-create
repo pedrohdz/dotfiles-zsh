@@ -1,0 +1,14 @@
+#! /usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+target_dir=${1:?Provide the project directory name as the first argument}
+default_branch=${2:-main}
+
+mkdir -p "$target_dir"
+git init --bare "$target_dir/.bare"
+echo "gitdir: .bare" > "$target_dir/.git"
+
+git -C "$target_dir" worktree add --orphan -b "$default_branch" "@${default_branch}"
