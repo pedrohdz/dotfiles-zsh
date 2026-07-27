@@ -11,9 +11,10 @@
 #------------------------------------------------------------------------------
 [alias]
   dt = difftool
+  dt-difftastic = difftool --no-prompt --tool=difftastic
   fetch-prune = "!f() { local target=\"${1:-origin}\"; git fetch --prune --prune-tags \"$target\"; }; f"
-  files-changed-diff = show --pretty=\"\" --name-only --dirstat=lines
-  files-in-commit = show --pretty=\"\" --name-only
+  files-changed-diff = show --pretty="" --name-only --dirstat=lines
+  files-in-commit = show --pretty="" --name-only
   logg = log --graph --decorate=full --show-signature
   mt = mergetool
   prune = "!f() { local target=\"${1:-origin}\"; git fetch --prune \"$target\" && git prune-tags \"$target\"; }; f"
@@ -37,7 +38,23 @@
 
 [core]
   excludesfile = ~/.config/git/gitignore-global
-  pager = less $LESS --quit-if-one-screen
+  # delta is the inline pager for `git diff` / `git log -p` / `git show`.
+  # It shells out to `less` internally; tune via the [delta] block below.
+  pager = delta
+
+[interactive]
+  # Colorize `git add -p` and other interactive hunk views with delta.
+  diffFilter = delta --color-only
+
+#------------------------------------------------------------------------------
+# delta  (inline pager -- requires the `delta` / git-delta binary on PATH)
+#------------------------------------------------------------------------------
+[delta]
+  navigate = true     # n / N jump between files/hunks
+  line-numbers = true
+  hyperlinks = true   # OSC-8 clickable paths (works in WezTerm)
+  side-by-side = true # enable on wide displays (e.g. the RD280UG)
+  pager = less -RF    # uncomment to restore --quit-if-one-screen
 
 #------------------------------------------------------------------------------
 # Command related configuration
@@ -45,6 +62,7 @@
 [commit]
   gpgSign = true
   template = ~/.config/git/templates/default-commit-template.txt
+  verbose = true          # show the staged diff in the editor while writing
 
 [tag]
   gpgSign = true
@@ -62,31 +80,78 @@
   stat = true
 
 #------------------------------------------------------------------------------
-# Diff tool
+# Conflict resolution memory
+#   rerere = REuse REcorded REsolution. Records how you resolve a conflict
+#   hunk and replays it automatically the next time the identical conflict
+#   appears. High value with pull.rebase=true, where replaying N commits
+#   often re-hits the SAME conflict N times.
+#------------------------------------------------------------------------------
+[rerere]
+  enabled = true
+
+#------------------------------------------------------------------------------
+# Diff behaviour (applies to ALL diffs: pager, difftool, log -p, add -p)
 #------------------------------------------------------------------------------
 [diff]
-  tool = neovimdiff
+  tool = nvimdiff
+  algorithm = histogram              # better hunk grouping than default Myers
+  colorMoved = zebra                 # moved lines shown distinctly from +/-
+  colorMovedWS = allow-indentation-change
+  renames = copies                   # detect copies too, not just renames
+  mnemonicPrefix = true              # i/ w/ c/ prefixes instead of a/ b/
 
-[difftool "neovimdiff"]
-  cmd = nvim -Rd \"$LOCAL\" \"$REMOTE\" -c 'wincmd w' -c 'wincmd L'
+#------------------------------------------------------------------------------
+# Diff tools
+#   - nvimdiff  : default GUI-style diff (built-in git backend, no hand-rolled
+#                 `cmd` / wincmd hacks needed). Uses nvim's own -d split; git's
+#                 vimdiff backend has no layout config for 2-way diffs (only
+#                 for git mergetool, see [mergetool "nvimdiff"] below).
+#   - difftastic: on-demand STRUCTURAL (AST-aware) diff. Reformatting and
+#                 whitespace churn stop showing as changes. Invoke with
+#                 `git dt-difftastic` or `git difftool -t difftastic`.
+#                 Requires the `difft` binary on PATH.
+#------------------------------------------------------------------------------
+[difftool]
+  prompt = true                      # ask before launching per file
 
-[difftool "sourcetree"]
-  cmd = opendiff \"$LOCAL\" \"$REMOTE\"
-  path = 
+[difftool "difftastic"]
+  cmd = difft "$LOCAL" "$REMOTE"
 
 #------------------------------------------------------------------------------
 # Merge tool
+#
+# LOCAL vs REMOTE -- "which side is mine?" (the part that trips everyone up)
+#   - LOCAL  = "ours"   (index stage 2);  REMOTE = "theirs" (index stage 3).
+#     This stage->name mapping NEVER changes. What LANDS in each side does:
+#   - merge / cherry-pick / revert : LOCAL = your current branch   (intuitive)
+#   - rebase  (and `git pull`, since pull.rebase=true) : INVERTED --
+#       * LOCAL  = the upstream you are replaying ONTO
+#       * REMOTE = your OWN commit being replayed
+#   - Rule of thumb: during a rebase, REMOTE is YOUR code.
+#   - MERGED is always your working file with conflict markers, either way.
+#     When unsure which "side" is yours, just resolve by editing MERGED.
+#
+# conflictStyle=zdiff3 also surfaces the common ancestor inside the in-file
+# markers, so you get context even without launching the tool.
 #------------------------------------------------------------------------------
 [merge]
-  tool = neovimdiff
+  tool = nvimdiff
+  conflictStyle = zdiff3
+  ff = false          # always create a merge commit (never silent fast-forward).
+                      # pull.rebase=true still wins for `git pull`, so pulls stay
+                      # linear; only explicit `git merge <branch>` gets a commit.
+                      # Use `git merge --ff-only` (or `git pullff`) for pure syncs.
+  log = true          # append a shortlog of merged commits to the default message
+                      # (up to 20). NOTE: commit.template does NOT apply to merge
+                      # commits -- this is the only lever on the merge default.
 
 [mergetool]
-  keepBackup = false
+  keepBackup = false                 # no .orig files left behind
+  prompt = false
+  hideResolved = true                # pre-fill non-conflicting hunks
 
-[mergetool "neovimdiff"]
-  #cmd = nvim -d \"$LOCAL\" \"$REMOTE\" \"$MERGED\" -c '$wincmd w' -c 'wincmd J'
-  cmd = nvim -Rd \"$LOCAL\" \"$MERGED\" \"$BASE\" \"$REMOTE\" -c 'wincmd w' -c 'wincmd J'
-  trustExitCode = true
+[mergetool "nvimdiff"]
+  layout = (LOCAL,BASE,REMOTE) / MERGED
 
 #------------------------------------------------------------------------------
 # Other
