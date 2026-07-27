@@ -108,7 +108,9 @@ in {
     coreutils
     curl
     cvs
+    delta
     diceware
+    difftastic
     fd
     findutils
     fzf
