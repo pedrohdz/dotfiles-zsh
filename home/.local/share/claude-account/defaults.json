@@ -147,14 +147,7 @@
       "Read(~/.gnupg/**)",
       "Read(~/Library/Keychains/**)",
       "Read(~/.password-store/**)",
-      "Read(~/.ssh/**)",
-      "Write(~/.aws/**)",
-      "Write(~/.config/gh/**)",
-      "Write(~/.config/github-copilot/**)",
-      "Write(~/.gnupg/**)",
-      "Write(~/Library/Keychains/**)",
-      "Write(~/.password-store/**)",
-      "Write(~/.ssh/**)"
+      "Read(~/.ssh/**)"
     ]
   }
 }
