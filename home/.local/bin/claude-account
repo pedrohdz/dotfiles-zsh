@@ -6,6 +6,7 @@ set -o nounset
 
 _CLAUDE_BIN="${CLAUDE_BIN:-${HOME}/.local/bin/claude}"
 _ACCOUNTS_DIR="${CLAUDE_ACCOUNTS_DIR:-${HOME}/.claude-accounts}"
+_AGENT_VAULT_BIN="${AGENT_VAULT_BIN:-agent-vault}"
 
 
 # ---------------------------------------------------------------------------
@@ -50,6 +51,8 @@ Environment:
                        Default: $_CLAUDE_BIN
   CLAUDE_ACCOUNTS_DIR  Directory containing per-account config directories.
                        Default: $_ACCOUNTS_DIR
+  AGENT_VAULT_BIN      Path to the agent-vault binary.
+                       Default: $_AGENT_VAULT_BIN
 EOF
 }
 
@@ -159,7 +162,13 @@ cmd_run() {
   [[ -d "$_account_dir" ]] \
     || fatal "Account '$_ACCOUNT' not found at $_account_dir. Run: ${0##*/} --init '$_ACCOUNT'"
   print_status
-  exec env CLAUDE_CONFIG_DIR="$_account_dir" "$_CLAUDE_BIN" "${_CLAUDE_ARGS[@]}"
+  local _vault="${_ACCOUNT}-agent-read-only"
+  exec \
+    "$_AGENT_VAULT_BIN" run --vault "$_vault" -- \
+      env \
+        CLAUDE_CONFIG_DIR="$_account_dir" \
+        GH_TOKEN='__gh_token__' \
+        "$_CLAUDE_BIN" "${_CLAUDE_ARGS[@]}"
 }
 
 

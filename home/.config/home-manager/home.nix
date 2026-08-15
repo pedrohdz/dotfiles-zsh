@@ -50,6 +50,10 @@ let
       treesitterGrammars
   );
 
+  # Not in nixpkgs and ships no upstream flake; packaged locally from
+  # GoReleaser's signed release binaries. See pkgs/agent-vault.nix.
+  agent-vault = pkgs.callPackage ./pkgs/agent-vault.nix { };
+
 in {
   # Home Manager needs a bit of information about you and the paths it should
   # manage.
@@ -211,6 +215,11 @@ in {
     lua51Packages.luacheck
     shellcheck
     yamllint
+
+    # ----
+    # Secrets / credential management
+    # ----
+    agent-vault
 
     # ----
     # NeoVim specific
