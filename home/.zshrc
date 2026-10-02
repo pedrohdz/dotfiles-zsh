@@ -120,6 +120,8 @@ zstyle ':completion:*' select-prompt '%SScrolling active: current selection at %
 zstyle ':completion:*' verbose true
 zstyle :compinstall filename "$HOME/.zshrc"
 
+zstyle ':completion:*:make:*:targets' call-command true
+
 autoload -Uz compinit
 compinit
 
