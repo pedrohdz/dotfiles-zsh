@@ -8,6 +8,23 @@ _CLAUDE_BIN="${CLAUDE_BIN:-${HOME}/.local/bin/claude}"
 _ACCOUNTS_DIR="${CLAUDE_ACCOUNTS_DIR:-${HOME}/.claude-accounts}"
 _AGENT_VAULT_BIN="${AGENT_VAULT_BIN:-agent-vault}"
 
+# Env for the wrapped agent so GitHub git and gh work through agent-vault.
+# The credentials are injected on the wire; nothing here is a real token.
+_AV_ENV=(
+  GH_TOKEN='__gh_token__'
+  GH_PAGER=cat
+  GIT_PAGER=cat
+  GIT_TERMINAL_PROMPT=0
+  GIT_SSH_COMMAND=false
+  GIT_CONFIG_COUNT=3
+  GIT_CONFIG_KEY_0='url.https://github.com/.insteadOf'
+  GIT_CONFIG_VALUE_0='ssh://git@github.com/'
+  GIT_CONFIG_KEY_1='url.https://github.com/.insteadOf'
+  GIT_CONFIG_VALUE_1='git@github.com:'
+  GIT_CONFIG_KEY_2='credential.helper'
+  GIT_CONFIG_VALUE_2=''
+)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -167,7 +184,7 @@ cmd_run() {
     "$_AGENT_VAULT_BIN" run --vault "$_vault" -- \
       env \
         CLAUDE_CONFIG_DIR="$_account_dir" \
-        GH_TOKEN='__gh_token__' \
+        "${_AV_ENV[@]}" \
         "$_CLAUDE_BIN" "${_CLAUDE_ARGS[@]}"
 }
 
