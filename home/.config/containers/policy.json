@@ -20,6 +20,16 @@
         {
           "type": "insecureAcceptAnything"
         }
+      ],
+      "mcr.microsoft.com": [
+        {
+          "type": "insecureAcceptAnything"
+        }
+      ],
+      "public.ecr.aws": [
+        {
+          "type": "insecureAcceptAnything"
+        }
       ]
     }
   }
