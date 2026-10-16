@@ -1,0 +1,213 @@
+#! /usr/bin/env bash
+
+set -o pipefail
+set -o errexit
+set -o nounset
+
+_WRAPPER_DIR="${AGENT_VAULT_WRAPPER_DIR:-${HOME}/.local/share/agent-vault-wrapper}"
+_ENV_DIR="${_WRAPPER_DIR}/env.d"
+_AGENT_VAULT_BIN="${AGENT_VAULT_BIN:-agent-vault}"
+
+_BLANK_OR_COMMENT_RE='^[[:space:]]*(#|$)'
+_VAR_NAME_RE='^[A-Za-z_][A-Za-z0-9_]*$'
+
+
+# ---------------------------------------------------------------------------
+# State
+# ---------------------------------------------------------------------------
+_VAULT=""
+_CMD=""
+_CMD_ARGS=()
+
+# --env / --env-file flags in the order given, as "env:KEY=VALUE" or
+# "file:PATH". Applied after parsing so common.env always loads first.
+_SOURCES=()
+
+# Merged environment for the wrapped command. _ENV_KEYS runs parallel to
+# _ENV_ARGS so a later value can replace an earlier one.
+_ENV_KEYS=()
+_ENV_ARGS=()
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+fatal() {
+  echo "FATAL - $*" >&2
+  exit 1
+}
+
+warn() {
+  echo "WARN - $*" >&2
+}
+
+print_status() {
+  if [[ -t 2 ]]; then
+    printf '\033[1m%s\033[0m: \033[36m%s\033[0m → \033[36m%s\033[0m\n' \
+      "${0##*/}" "$_VAULT" "$_CMD" >&2
+  else
+    printf '%s: %s → %s\n' "${0##*/}" "$_VAULT" "$_CMD" >&2
+  fi
+}
+
+usage() {
+  cat <<EOF
+Usage: ${0##*/} --vault <name> [--env KEY=VALUE]... [--env-file PATH]... \\
+           -- <cmd> [args...]
+
+Run a command under an Agent Vault session scoped to a vault, with extra
+environment variables set for the wrapped command only.
+
+Options:
+  --vault <name>      Vault to scope the session to (required)
+  --env KEY=VALUE     Set a variable for the command (repeatable)
+  --env-file <path>   Load KEY=VALUE lines from a file (repeatable)
+  --help, -h          Show this help and exit
+
+Variables apply in order, later values overriding earlier ones (with a
+warning): env.d/common.env first, then --env and --env-file as given.
+
+Env file format: one KEY=VALUE per line. The value is everything after the
+first '=', taken literally (no quotes, no expansion). Blank lines and lines
+starting with '#' are ignored. Files are parsed, never sourced.
+
+Environment:
+  AGENT_VAULT_BIN          Path to the agent-vault binary.
+                           Default: $_AGENT_VAULT_BIN
+  AGENT_VAULT_WRAPPER_DIR  Data directory; env.d/common.env is read from it.
+                           Default: $_WRAPPER_DIR
+EOF
+}
+
+
+# ---------------------------------------------------------------------------
+# Environment handling
+# ---------------------------------------------------------------------------
+set_var() {
+  local _key="$1"
+  local _value="$2"
+  local _origin="$3"
+  local _count="${#_ENV_KEYS[@]}"
+  local _i
+
+  [[ "$_key" =~ $_VAR_NAME_RE ]] \
+    || fatal "Invalid variable name '$_key' ($_origin)"
+
+  for (( _i = 0; _i < _count; _i++ )); do
+    if [[ "${_ENV_KEYS[$_i]}" == "$_key" ]]; then
+      warn "$_key overridden by $_origin"
+      _ENV_ARGS[_i]="${_key}=${_value}"
+      return
+    fi
+  done
+  _ENV_KEYS+=("$_key")
+  _ENV_ARGS+=("${_key}=${_value}")
+}
+
+add_env() {
+  local _pair="$1"
+  [[ "$_pair" == *=* ]] || fatal "--env requires KEY=VALUE, got: $_pair"
+  set_var "${_pair%%=*}" "${_pair#*=}" "--env"
+}
+
+load_env_file() {
+  local _file="$1"
+  local _line
+  local _lineno=0
+
+  [[ -f "$_file" && -r "$_file" ]] || fatal "Env file not readable: $_file"
+
+  while IFS= read -r _line || [[ -n "$_line" ]]; do
+    _lineno=$(( _lineno + 1 ))
+    if [[ "$_line" =~ $_BLANK_OR_COMMENT_RE ]]; then
+      continue
+    fi
+    [[ "$_line" == *=* ]] || fatal "$_file:$_lineno: expected KEY=VALUE"
+    set_var "${_line%%=*}" "${_line#*=}" "$_file:$_lineno"
+  done < "$_file"
+}
+
+load_env() {
+  local _common="$_ENV_DIR/common.env"
+  local _source
+
+  if [[ -f "$_common" ]]; then
+    load_env_file "$_common"
+  fi
+
+  for _source in ${_SOURCES[@]+"${_SOURCES[@]}"}; do
+    case "$_source" in
+      env:*)  add_env "${_source#env:}" ;;
+      file:*) load_env_file "${_source#file:}" ;;
+    esac
+  done
+}
+
+
+# ---------------------------------------------------------------------------
+# Argument parsing
+# ---------------------------------------------------------------------------
+configure() {
+  while (( $# )); do
+    case "$1" in
+      -h|--help)
+        usage; exit 0 ;;
+      --vault)
+        [[ $# -ge 2 ]] || fatal "--vault requires a vault name"
+        _VAULT="$2"; shift 2 ;;
+      --vault=*)
+        _VAULT="${1#--vault=}"; shift ;;
+      --env)
+        [[ $# -ge 2 ]] || fatal "--env requires KEY=VALUE"
+        _SOURCES+=("env:$2"); shift 2 ;;
+      --env=*)
+        _SOURCES+=("env:${1#--env=}"); shift ;;
+      --env-file)
+        [[ $# -ge 2 ]] || fatal "--env-file requires a path"
+        _SOURCES+=("file:$2"); shift 2 ;;
+      --env-file=*)
+        _SOURCES+=("file:${1#--env-file=}"); shift ;;
+      --)
+        shift; break ;;
+      -*)
+        fatal "Unknown option: $1" ;;
+      *)
+        fatal "Unexpected argument: $1 (the command goes after --)" ;;
+    esac
+  done
+
+  [[ -n "$_VAULT" ]] || fatal "--vault is required"
+  (( $# )) || fatal "No command given (expected: -- <cmd> [args...])"
+
+  _CMD="$1"
+  shift
+  _CMD_ARGS=("$@")
+
+  # env(1) would read these as its own options or assignments.
+  [[ "$_CMD" != -* ]] || fatal "Command may not start with '-': $_CMD"
+  [[ "$_CMD" != *=* ]] || fatal "Command may not contain '=': $_CMD"
+}
+
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+cmd_run() {
+  command -v "$_AGENT_VAULT_BIN" >/dev/null 2>&1 \
+    || fatal "agent-vault binary not found: $_AGENT_VAULT_BIN"
+  command -v "$_CMD" >/dev/null 2>&1 \
+    || fatal "Command not found: $_CMD"
+  load_env
+  print_status
+  exec "$_AGENT_VAULT_BIN" run --vault "$_VAULT" -- \
+    env ${_ENV_ARGS[@]+"${_ENV_ARGS[@]}"} \
+      "$_CMD" ${_CMD_ARGS[@]+"${_CMD_ARGS[@]}"}
+}
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+[[ $# -gt 0 ]] || { usage >&2; exit 1; }
+configure "$@"
+cmd_run
