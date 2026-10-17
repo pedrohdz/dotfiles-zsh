@@ -95,9 +95,10 @@ _rate_5h_pct=$(jq -r '.rate_limits.five_hour.used_percentage // ""' <<< "$_input
 _rate_5h_at=$( jq -r '.rate_limits.five_hour.resets_at      // ""' <<< "$_input")
 _rate_7d_pct=$(jq -r '.rate_limits.seven_day.used_percentage // ""' <<< "$_input")
 
-# Account name from CLAUDE_CONFIG_DIR (set by claude-account wrapper)
-_account=""
-[[ -n "${CLAUDE_CONFIG_DIR:-}" ]] && _account="${CLAUDE_CONFIG_DIR##*/}"
+# Account name: AGENT_HARNESS_ACCOUNT (set by agent-harness-wrapper) if present,
+# else the last component of CLAUDE_CONFIG_DIR (the claude-account layout).
+_account="${AGENT_HARNESS_ACCOUNT:-}"
+[[ -z "$_account" && -n "${CLAUDE_CONFIG_DIR:-}" ]] && _account="${CLAUDE_CONFIG_DIR##*/}"
 
 # Git branch
 _branch=""

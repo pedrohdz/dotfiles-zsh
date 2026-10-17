@@ -1,0 +1,438 @@
+#! /usr/bin/env bash
+
+set -o pipefail
+set -o errexit
+set -o nounset
+
+_HARNESS_DIR="${AGENT_HARNESS_WRAPPER_DIR:-${HOME}/.config/agent-harness-wrapper}"
+_STATE_DIR="${AGENT_HARNESS_WRAPPER_STATE_DIR:-${HOME}/.agent-harness-wrapper}"
+_WRAPPER_BIN="${AGENT_VAULT_WRAPPER_BIN:-${HOME}/.local/bin/agent-vault-wrapper}"
+
+# Vault naming (<account>-<purpose>-<access>) lives in a library shared with
+# agent-vault-wrapper.
+_LIB_DIR="${AGENT_VAULT_WRAPPER_LIB:-${HOME}/.local/lib/agent-vault-wrapper}"
+
+# This script's own library: json-merge.jq for --apply-defaults.
+_JQ_LIB_DIR="${AGENT_HARNESS_WRAPPER_LIB:-${HOME}/.local/lib/agent-harness-wrapper}"
+
+# Account names become a directory name and part of a vault name.
+_ACCOUNT_RE='^[A-Za-z0-9_-][A-Za-z0-9._-]*$'
+
+
+# ---------------------------------------------------------------------------
+# State
+# ---------------------------------------------------------------------------
+_COMMAND=""
+_DRY_RUN=0
+_HARNESS=""
+_ACCOUNT=""
+_HARNESS_ARGS=()
+
+# Filled in by resolve_account.
+_ACCOUNT_DIR=""
+
+# Filled in by harness_lookup (from the harness's harness_def_* function).
+_HARNESS_BIN=""
+_HARNESS_ENV=()
+_HARNESS_DEFAULTS=""
+_HARNESS_SETTINGS=""
+
+# Printed by fatal after its message, for steps that leave a partial result.
+_FATAL_NOTE=""
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+fatal() {
+  echo "FATAL - $*" >&2
+  [[ -z "$_FATAL_NOTE" ]] || echo "$_FATAL_NOTE" >&2
+  exit 1
+}
+
+print_status() {
+  local _dir="$1"
+  if [[ -t 2 ]]; then
+    printf '\033[1m%s\033[0m: \033[36m%s\033[0m %s → \033[36m%s\033[0m\n' \
+      "${0##*/}" "$_HARNESS" "$_ACCOUNT" "$_dir" >&2
+  else
+    printf '%s: %s %s → %s\n' "${0##*/}" "$_HARNESS" "$_ACCOUNT" "$_dir" >&2
+  fi
+}
+
+usage() {
+  cat <<EOF
+Usage: ${0##*/} --run <harness> <account> [HARNESS_ARGS...]
+       ${0##*/} --init <harness> <account>
+       ${0##*/} --apply-defaults [--dry-run] <harness> <account>
+       <harness>-<account> [HARNESS_ARGS...]    (symlink mode, see below)
+
+Run an agent harness under a per-account state directory, through
+agent-vault-wrapper, on the account's read-only agent vault. Every argument
+after <account> goes to the harness untouched, including --help.
+
+Harnesses:
+  claude    state in <state root>/accounts/<account>/claude, passed to the
+            harness as CLAUDE_CONFIG_DIR
+
+Symlink mode:
+  Invoked through a symlink named <harness>-<account>, the script runs that
+  harness for that account with every argument passed through untouched. It
+  parses no flags of its own there, so --help reaches the harness; this help
+  is for direct mode only.
+    ln -s agent-harness-wrapper ~/.local/bin/claude-drounin
+
+The account directory must already exist; --init creates it. The environment
+for the harness is every stub in agent-vault-wrapper's envs/ (--env-all), then this script's own
+envs/*.env, then AGENT_HARNESS_ACCOUNT (the account name) and the harness's
+state variable(s); later values win.
+
+--init creates <state root>/accounts/<account>/<harness> (mode 700, with
+GNU install) and fails if it already exists. It does not start the harness:
+launch it afterwards and log in there, inside the vault.
+
+--apply-defaults merges the harness's defaults file (defaults/<harness>/ in the
+config directory) into the account's settings file. Objects merge key by key, arrays are a
+union, and any other value is replaced by the default; keys and entries only
+the account has are kept. It prints what changed. A changed existing file is
+first copied to <file>.bak-<UTC timestamp> (never pruned) and replaced
+atomically. --dry-run prints the changes and writes nothing. Do not apply
+while a session is open: the harness rewrites its own settings too.
+--init applies the defaults to the account it creates.
+
+Options:
+  --run <harness> <account> [ARGS...]   Launch the harness
+  --init <harness> <account>            Create the account's state directory
+  --apply-defaults [--dry-run] <harness> <account>
+                                        Merge the harness defaults into the
+                                        account's settings
+  --help, -h                            Show this help and exit
+
+Environment:
+  AGENT_HARNESS_WRAPPER_DIR        Config directory. Its envs/ must exist (it
+                                   may be empty).
+                                   Default: $_HARNESS_DIR
+  AGENT_HARNESS_WRAPPER_STATE_DIR  State root; must be an absolute path.
+                                   Default: $_STATE_DIR
+  AGENT_HARNESS_BIN                Path to the harness binary, replacing the
+                                   pinned one (for tests).
+  AGENT_VAULT_WRAPPER_BIN          Path to agent-vault-wrapper.
+                                   Default: $_WRAPPER_BIN
+  AGENT_VAULT_WRAPPER_LIB          Directory holding vault-naming.sh.
+                                   Default: $_LIB_DIR
+  AGENT_HARNESS_WRAPPER_LIB        Directory holding json-merge.jq.
+                                   Default: $_JQ_LIB_DIR
+EOF
+}
+
+
+# ---------------------------------------------------------------------------
+# Harness table
+# ---------------------------------------------------------------------------
+# One harness_def_<name> function per harness, called with the account's state
+# directory. It sets:
+#   _HARNESS_BIN  pinned binary path: PATH resolution could pick a different
+#                 install (a system one ahead of the user's)
+#   _HARNESS_ENV  assignments (KEY=VALUE) that point the harness at the
+#                 state directory; a harness may need several
+#   _HARNESS_DEFAULTS  path of its defaults file relative to defaults/ in the
+#                 config directory; empty if it has none
+#   _HARNESS_SETTINGS  full path of the settings file --apply-defaults merges
+#                 into. Compute it with _HARNESS_ENV from one variable so the
+#                 two cannot disagree.
+harness_def_claude() {
+  _HARNESS_BIN="${AGENT_HARNESS_BIN:-${HOME}/.local/bin/claude}"
+  _HARNESS_ENV=("CLAUDE_CONFIG_DIR=$1")
+  _HARNESS_DEFAULTS=claude/settings.json
+  _HARNESS_SETTINGS="$1/settings.json"
+}
+
+# Call the harness's definition. The name is checked against a plain-word
+# pattern and the harness_def_ prefix keeps it from reaching any other
+# function in this script.
+harness_lookup() {
+  local _state_dir="$1"
+
+  if [[ ! "$_HARNESS" =~ ^[a-z][a-z0-9]*$ ]] \
+    || ! declare -F "harness_def_$_HARNESS" >/dev/null; then
+    fatal "Unknown harness '$_HARNESS' (known: claude)"
+  fi
+  "harness_def_$_HARNESS" "$_state_dir"
+}
+
+
+# ---------------------------------------------------------------------------
+# Argument parsing
+# ---------------------------------------------------------------------------
+configure() {
+  case "${1:-}" in
+    -h|--help)
+      usage; exit 0 ;;
+    --apply-defaults)
+      shift
+      if [[ "${1:-}" == --dry-run ]]; then
+        _DRY_RUN=1
+        shift
+      fi
+      [[ $# -ge 2 ]] || fatal "--apply-defaults requires a harness and an account"
+      [[ $# -eq 2 ]] || fatal "--apply-defaults takes no arguments after the account (--dry-run goes first)"
+      _COMMAND=apply
+      _HARNESS="$1"
+      _ACCOUNT="$2" ;;
+    --init)
+      [[ $# -ge 3 ]] || fatal "--init requires a harness and an account"
+      [[ $# -eq 3 ]] || fatal "--init takes no arguments after the account"
+      _COMMAND=init
+      _HARNESS="$2"
+      _ACCOUNT="$3" ;;
+    --run)
+      [[ $# -ge 3 ]] || fatal "--run requires a harness and an account"
+      _COMMAND=run
+      _HARNESS="$2"
+      _ACCOUNT="$3"
+      shift 3
+      _HARNESS_ARGS=("$@") ;;
+    -*)
+      fatal "Unknown option: $1" ;;
+    *)
+      fatal "Unexpected argument: $1 (use --run, --init or --apply-defaults with <harness> <account>)" ;;
+  esac
+}
+
+# Symlink mode: the invoked name is <harness>-<account> and every argument
+# belongs to the harness.
+configure_symlink() {
+  local _self="${0##*/}"
+
+  [[ "$_self" == *-* && -n "${_self%%-*}" && -n "${_self#*-}" ]] \
+    || fatal "Invoked as '$_self'; expected <harness>-<account>"
+
+  _COMMAND=run
+  _HARNESS="${_self%%-*}"
+  _ACCOUNT="${_self#*-}"
+  _HARNESS_ARGS=("$@")
+}
+
+# Symlink mode is when the script runs under a name other than its own. If
+# the real path can't be resolved, fall back to direct mode.
+is_symlink_invocation() {
+  local _real
+  _real="$(readlink -f "$0" 2>/dev/null)" || return 1
+  [[ "${0##*/}" != "${_real##*/}" ]]
+}
+
+# Source the shared vault-naming library, refusing to continue if it is
+# missing or incomplete: a wrong or empty vault name must never reach
+# agent-vault.
+load_naming_lib() {
+  local _lib="$_LIB_DIR/vault-naming.sh"
+
+  [[ -f "$_lib" ]] \
+    || fatal "Vault naming library not found: $_lib (install the config, or set AGENT_VAULT_WRAPPER_LIB to a directory containing vault-naming.sh)"
+  # shellcheck source-path=SCRIPTDIR
+  # shellcheck source=../lib/agent-vault-wrapper/vault-naming.sh
+  source "$_lib"
+  declare -F vault_name >/dev/null \
+    && [[ -n "${VAULT_PURPOSE_AGENT:-}" && -n "${VAULT_ACCESS_READONLY:-}" ]] \
+    || fatal "Vault naming library is incomplete: $_lib (needs vault_name, VAULT_PURPOSE_AGENT and VAULT_ACCESS_READONLY)"
+}
+
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+# Validate the harness, the account and the state root, and set _ACCOUNT_DIR
+# and the harness's definition variables.
+resolve_account() {
+  local LC_ALL=C
+
+  [[ "$_ACCOUNT" =~ $_ACCOUNT_RE ]] \
+    || fatal "Invalid account '$_ACCOUNT' (letters, digits, '.', '_', '-'; may not start with '.')"
+  [[ "$_STATE_DIR" == /* ]] \
+    || fatal "State root must be an absolute path: $_STATE_DIR"
+
+  _ACCOUNT_DIR="$_STATE_DIR/accounts/$_ACCOUNT/$_HARNESS"
+  harness_lookup "$_ACCOUNT_DIR"
+}
+
+# Merge the harness's defaults into its settings file in the account's state
+# directory (see json-merge.jq for the rules). Prints what changed, and unless
+# _DRY_RUN is set, backs up the old file and replaces it atomically.
+apply_defaults() {
+  local _defaults_file="$_HARNESS_DIR/defaults/$_HARNESS_DEFAULTS"
+  local _merge_file="$_JQ_LIB_DIR/json-merge.jq"
+  local _acct='{}'
+  local _result
+  local _line
+  local _mode=600
+  local _backup=""
+  local _tmp
+  local _changes=()
+
+  [[ -n "$_HARNESS_DEFAULTS" ]] \
+    || fatal "No defaults defined for harness '$_HARNESS'"
+  command -v jq >/dev/null 2>&1 || fatal "jq is required for --apply-defaults"
+  [[ -f "$_defaults_file" && -r "$_defaults_file" ]] \
+    || fatal "Defaults file not readable: $_defaults_file (install the config, or set AGENT_HARNESS_WRAPPER_DIR)"
+  [[ -f "$_merge_file" && -r "$_merge_file" ]] \
+    || fatal "Merge filter not found: $_merge_file (install the config, or set AGENT_HARNESS_WRAPPER_LIB to a directory containing json-merge.jq)"
+  jq -e 'type == "object"' "$_defaults_file" >/dev/null 2>&1 \
+    || fatal "Defaults file is not a JSON object: $_defaults_file"
+
+  if [[ -e "$_HARNESS_SETTINGS" ]]; then
+    jq -e 'type == "object"' "$_HARNESS_SETTINGS" >/dev/null 2>&1 \
+      || fatal "Not a JSON object, left untouched: $_HARNESS_SETTINGS"
+    _acct="$(<"$_HARNESS_SETTINGS")"
+  fi
+
+  _result="$(jq -n --argjson acct "$_acct" --argjson defs "$(<"$_defaults_file")" \
+    -f "$_merge_file")" \
+    || fatal "Merge failed for $_HARNESS_SETTINGS (left untouched)"
+
+  while IFS= read -r _line; do
+    _changes+=("$_line")
+  done < <(jq -r '.changes[]' <<<"$_result")
+
+  if (( ${#_changes[@]} == 0 )); then
+    echo "No changes: $_HARNESS_SETTINGS" >&2
+    return
+  fi
+
+  echo "Changes to $_HARNESS_SETTINGS:" >&2
+  printf '  %s\n' "${_changes[@]}" >&2
+
+  if (( _DRY_RUN )); then
+    echo "Dry run: nothing written." >&2
+    return
+  fi
+
+  [[ "$(install --version 2>&1)" == *GNU* ]] \
+    || fatal "GNU install is required"
+  _tmp="$(mktemp "$_HARNESS_SETTINGS.tmp.XXXXXX")" \
+    || fatal "Cannot create a temporary file next to $_HARNESS_SETTINGS"
+  if [[ -e "$_HARNESS_SETTINGS" ]]; then
+    _mode="$(stat -c %a "$_HARNESS_SETTINGS")"
+    _backup="$_HARNESS_SETTINGS.bak-$(date -u +%Y%m%dT%H%M%SZ)"
+    if [[ -e "$_backup" ]]; then
+      rm -f "$_tmp"
+      fatal "Backup already exists, nothing written: $_backup"
+    fi
+  fi
+  if ! jq '.settings' <<<"$_result" > "$_tmp" \
+      || ! jq -e 'type == "object"' "$_tmp" >/dev/null 2>&1 \
+      || ! chmod "$_mode" "$_tmp"; then
+    rm -f "$_tmp"
+    fatal "Could not write the merged settings (left untouched): $_HARNESS_SETTINGS"
+  fi
+  if [[ -n "$_backup" ]] && ! install -m 600 "$_HARNESS_SETTINGS" "$_backup"; then
+    rm -f "$_tmp"
+    fatal "Could not back up $_HARNESS_SETTINGS (left untouched)"
+  fi
+  mv -f "$_tmp" "$_HARNESS_SETTINGS" \
+    || fatal "Could not replace $_HARNESS_SETTINGS (merged copy left at $_tmp)"
+
+  echo "Updated: $_HARNESS_SETTINGS" >&2
+  [[ -z "$_backup" ]] || echo "Backup: $_backup" >&2
+}
+
+cmd_apply_defaults() {
+  resolve_account
+  [[ -d "$_ACCOUNT_DIR" ]] \
+    || fatal "No $_HARNESS state for account '$_ACCOUNT' at $_ACCOUNT_DIR (create it with: ${0##*/} --init $_HARNESS $_ACCOUNT)"
+  apply_defaults
+}
+
+cmd_init() {
+  local _dir
+  local _vault
+
+  resolve_account
+  # install -d succeeds on an existing directory, so refuse first.
+  [[ ! -e "$_ACCOUNT_DIR" ]] \
+    || fatal "Already exists: $_ACCOUNT_DIR (nothing changed)"
+  # -m applies to the last component only, so each missing level is created
+  # on its own to keep all of them private.
+  [[ "$(install --version 2>&1)" == *GNU* ]] \
+    || fatal "GNU install is required"
+  load_naming_lib
+  _vault="$(vault_name "$_ACCOUNT" "$VAULT_PURPOSE_AGENT" "$VAULT_ACCESS_READONLY")"
+
+  for _dir in "$_STATE_DIR" "$_STATE_DIR/accounts" \
+              "$_STATE_DIR/accounts/$_ACCOUNT" "$_ACCOUNT_DIR"; do
+    [[ -d "$_dir" ]] || install -d -m 700 "$_dir"
+  done
+
+  echo "Created: $_ACCOUNT_DIR" >&2
+  if [[ -n "$_HARNESS_DEFAULTS" ]]; then
+    _FATAL_NOTE="The directory was created. Fix the problem above, then run: ${0##*/} --apply-defaults $_HARNESS $_ACCOUNT"
+    apply_defaults
+    _FATAL_NOTE=""
+  fi
+  echo "Next: run ${_HARNESS}-${_ACCOUNT} (or ${0##*/} --run ${_HARNESS} ${_ACCOUNT}) and log in." >&2
+  echo "It launches under vault '$_vault'." >&2
+}
+
+cmd_run() {
+  local _env_dir="$_HARNESS_DIR/envs"
+  local _env_file
+  local _vault
+  local _file_args=()
+  local _state_args=()
+  local _assignment
+  local LC_ALL=C
+
+  resolve_account
+  [[ -d "$_ACCOUNT_DIR" ]] \
+    || fatal "No $_HARNESS state for account '$_ACCOUNT' at $_ACCOUNT_DIR (create it with: ${0##*/} --init $_HARNESS $_ACCOUNT)"
+
+  # A missing directory means the install is incomplete; refuse to run
+  # rather than start the harness without its environment.
+  [[ -d "$_env_dir" ]] \
+    || fatal "Env directory not found: $_env_dir (install the config, or set AGENT_HARNESS_WRAPPER_DIR to a directory containing envs/)"
+
+  [[ -x "$_WRAPPER_BIN" ]] \
+    || fatal "agent-vault-wrapper not found or not executable: $_WRAPPER_BIN"
+  command -v "$_HARNESS_BIN" >/dev/null 2>&1 \
+    || fatal "$_HARNESS binary not found: $_HARNESS_BIN"
+
+  load_naming_lib
+  _vault="$(vault_name "$_ACCOUNT" "$VAULT_PURPOSE_AGENT" "$VAULT_ACCESS_READONLY")"
+
+  shopt -s nullglob
+  for _env_file in "$_env_dir"/*.env; do
+    _file_args+=(--env-file "$_env_file")
+  done
+  shopt -u nullglob
+
+  # The account name, for tools that cannot derive it from the state path
+  # (claude-status).
+  _state_args+=(--env "AGENT_HARNESS_ACCOUNT=$_ACCOUNT")
+  for _assignment in "${_HARNESS_ENV[@]}"; do
+    _state_args+=(--env "$_assignment")
+  done
+
+  print_status "$_ACCOUNT_DIR"
+  exec "$_WRAPPER_BIN" \
+    --vault "$_vault" \
+    --env-all \
+    ${_file_args[@]+"${_file_args[@]}"} \
+    "${_state_args[@]}" \
+    -- "$_HARNESS_BIN" ${_HARNESS_ARGS[@]+"${_HARNESS_ARGS[@]}"}
+}
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+if is_symlink_invocation; then
+  configure_symlink "$@"
+else
+  [[ $# -gt 0 ]] || { usage >&2; exit 1; }
+  configure "$@"
+fi
+
+case "$_COMMAND" in
+  init)  cmd_init ;;
+  apply) cmd_apply_defaults ;;
+  run)   cmd_run ;;
+esac

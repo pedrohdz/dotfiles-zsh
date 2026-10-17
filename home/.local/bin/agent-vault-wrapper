@@ -4,18 +4,19 @@ set -o pipefail
 set -o errexit
 set -o nounset
 
-_WRAPPER_DIR="${AGENT_VAULT_WRAPPER_DIR:-${HOME}/.local/share/agent-vault-wrapper}"
+_WRAPPER_DIR="${AGENT_VAULT_WRAPPER_DIR:-${HOME}/.config/agent-vault-wrapper}"
 _ENV_DIR="${_WRAPPER_DIR}/envs"
 _AGENT_VAULT_BIN="${AGENT_VAULT_BIN:-agent-vault}"
 
-# Symlink mode names the vault <account>-<purpose>-<access>. Stopgap: borrow
-# the read-only agent vaults until user/full vaults exist, then flip these.
-_DEFAULT_PURPOSE=agent
-_DEFAULT_ACCESS=read-only
-_ACCESS="${AGENT_VAULT_WRAPPER_ACCESS:-$_DEFAULT_ACCESS}"
+# Vault naming (<account>-<purpose>-<access>) lives in a library shared with
+# agent-harness-wrapper. Only symlink mode builds a name, so only it loads it.
+_LIB_DIR="${AGENT_VAULT_WRAPPER_LIB:-${HOME}/.local/lib/agent-vault-wrapper}"
 
 _BLANK_OR_COMMENT_RE='^[[:space:]]*(#|$)'
 _VAR_NAME_RE='^[A-Za-z_][A-Za-z0-9_]*$'
+# Canonical --env-name: '/'-separated components, each non-empty and not
+# starting with '.', so a valid name always normalizes to itself.
+_ENV_NAME_RE='^[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$'
 
 
 # ---------------------------------------------------------------------------
@@ -25,8 +26,9 @@ _VAULT=""
 _CMD=""
 _CMD_ARGS=()
 
-# --env / --env-file flags in the order given, as "env:KEY=VALUE" or
-# "file:PATH". Applied after parsing so common.env always loads first.
+# --env / --env-file / --env-name flags in the order given, as "env:KEY=VALUE",
+# "file:PATH" or "name:NAME". Applied after parsing so common.env always loads
+# first.
 _SOURCES=()
 
 # Merged environment for the wrapped command. _ENV_KEYS runs parallel to
@@ -59,7 +61,7 @@ print_status() {
 usage() {
   cat <<EOF
 Usage: ${0##*/} --vault <name> [--env KEY=VALUE]... [--env-file PATH]... \\
-           -- <cmd> [args...]
+           [--env-name NAME]... [--env-all] -- <cmd> [args...]
        <tool>-<account> [TOOL_ARGS...]    (symlink mode, see below)
 
 Run a command under an Agent Vault session scoped to a vault, with extra
@@ -69,18 +71,27 @@ Symlink mode:
   Invoked through a symlink named <tool>-<account>, the wrapper runs <tool>
   with every argument passed through untouched. It parses no flags of its
   own there, so --help reaches the tool; this help is for direct mode only.
-  The vault is <account>-<purpose>-<access> (currently ${_DEFAULT_PURPOSE}-${_DEFAULT_ACCESS}),
-  and envs/<tool>.env is loaded after common.env if it exists.
-    ln -s agent-vault-wrapper ~/.local/bin/gh-outnordic
+  The vault is <account>-<purpose>-<access>; vault-naming.sh sets the purpose
+  and the default access, and AGENT_VAULT_WRAPPER_ACCESS overrides the access.
+  envs/<tool>.env is loaded after common.env if it exists.
+    ln -s agent-vault-wrapper ~/.local/bin/gh-drounin
 
 Options (direct mode):
   --vault <name>      Vault to scope the session to (required)
   --env KEY=VALUE     Set a variable for the command (repeatable)
   --env-file <path>   Load KEY=VALUE lines from a file (repeatable)
+  --env-name NAME     Load envs/NAME.env from the config dir (repeatable);
+                      NAME may include subdirectories (acct/jira) and must be
+                      canonical: no '.', '..', '//' or leading/trailing '/'
+  --env-all           Load every envs/*.env (not common.env, no
+                      subdirectories) in sorted order and list the names
+                      loaded. Anything added to envs/ is picked up, so keep
+                      those files to stubs.
   --help, -h          Show this help and exit
 
 Variables apply in order, later values overriding earlier ones (with a
-warning): envs/common.env first, then --env and --env-file as given.
+warning): envs/common.env first, then --env, --env-file, --env-name and
+--env-all as given.
 
 Env file format: one KEY=VALUE per line. The value is everything after the
 first '=', taken literally (no quotes, no expansion). Blank lines and lines
@@ -89,11 +100,14 @@ starting with '#' are ignored. Files are parsed, never sourced.
 Environment:
   AGENT_VAULT_BIN          Path to the agent-vault binary.
                            Default: $_AGENT_VAULT_BIN
-  AGENT_VAULT_WRAPPER_DIR  Data directory; envs/common.env is read from it.
+  AGENT_VAULT_WRAPPER_DIR  Config directory. Its envs/ must exist (it may be
+                           empty); envs/common.env is read from it.
                            Default: $_WRAPPER_DIR
   AGENT_VAULT_WRAPPER_ACCESS
                            Access part of the vault name in symlink mode.
-                           Default: $_DEFAULT_ACCESS
+                           Default: WRAPPER_DEFAULT_ACCESS in vault-naming.sh
+  AGENT_VAULT_WRAPPER_LIB  Directory holding vault-naming.sh (symlink mode).
+                           Default: $_LIB_DIR
 EOF
 }
 
@@ -145,9 +159,55 @@ load_env_file() {
   done < "$_file"
 }
 
+# --env-name NAME loads envs/NAME.env from the config directory. NAME may
+# include subdirectories (<account>/jira) but must already be in canonical
+# form: anything a path normalizer would change (., .., //, a leading or
+# trailing /) is rejected, so a name cannot smuggle in a different path.
+load_env_name() {
+  local _name="$1"
+  local _path="$_ENV_DIR/$_name.env"
+  # Ranges like A-Z follow the locale's collation order and can match accented
+  # letters; match bytewise so the grammar means plain ASCII.
+  local LC_ALL=C
+
+  [[ "$_name" =~ $_ENV_NAME_RE ]] \
+    || fatal "Invalid --env-name '$_name' (letters, digits, '.', '_', '-', with '/' between non-empty components; a component may not start with '.')"
+  [[ -f "$_path" ]] || fatal "No env file named '$_name': $_path"
+  load_env_file "$_path"
+}
+
+# --env-all loads every envs/*.env directly under the config directory, in
+# byte-sorted order, except common.env (already loaded first). Subdirectories
+# are not entered. The names are reported so a new file showing up in a launch
+# is visible.
+load_env_all() {
+  local _file
+  local _base
+  local _names=()
+  local LC_ALL=C
+
+  shopt -s nullglob
+  for _file in "$_ENV_DIR"/*.env; do
+    _base="${_file##*/}"
+    [[ "$_base" != common.env && -f "$_file" ]] || continue
+    load_env_file "$_file"
+    _names+=("${_base%.env}")
+  done
+  shopt -u nullglob
+
+  echo "${0##*/}: --env-all loaded: ${_names[*]-(none)}" >&2
+}
+
 load_env() {
   local _common="$_ENV_DIR/common.env"
   local _source
+
+  # A missing individual file is normal, but a missing directory means the
+  # install is incomplete (e.g. not yet relinked). Refuse to run: the command
+  # would otherwise start without its stub environment.
+  if [[ ! -d "$_ENV_DIR" ]]; then
+    fatal "Env directory not found: $_ENV_DIR (install the config, or set AGENT_VAULT_WRAPPER_DIR to a directory containing envs/)"
+  fi
 
   if [[ -f "$_common" ]]; then
     load_env_file "$_common"
@@ -157,6 +217,8 @@ load_env() {
     case "$_source" in
       env:*)  add_env "${_source#env:}" ;;
       file:*) load_env_file "${_source#file:}" ;;
+      name:*) load_env_name "${_source#name:}" ;;
+      all:*)  load_env_all ;;
     esac
   done
 }
@@ -191,6 +253,13 @@ configure() {
         _SOURCES+=("file:$2"); shift 2 ;;
       --env-file=*)
         _SOURCES+=("file:${1#--env-file=}"); shift ;;
+      --env-name)
+        [[ $# -ge 2 ]] || fatal "--env-name requires a name"
+        _SOURCES+=("name:$2"); shift 2 ;;
+      --env-name=*)
+        _SOURCES+=("name:${1#--env-name=}"); shift ;;
+      --env-all)
+        _SOURCES+=("all:"); shift ;;
       --)
         shift; break ;;
       -*)
@@ -209,6 +278,22 @@ configure() {
   check_cmd
 }
 
+# Source the shared vault-naming library, refusing to continue if it is
+# missing or incomplete: a wrong or empty vault name must never reach
+# agent-vault.
+load_naming_lib() {
+  local _lib="$_LIB_DIR/vault-naming.sh"
+
+  [[ -f "$_lib" ]] \
+    || fatal "Vault naming library not found: $_lib (install the config, or set AGENT_VAULT_WRAPPER_LIB to a directory containing vault-naming.sh)"
+  # shellcheck source-path=SCRIPTDIR
+  # shellcheck source=../lib/agent-vault-wrapper/vault-naming.sh
+  source "$_lib"
+  declare -F vault_name >/dev/null \
+    && [[ -n "${WRAPPER_DEFAULT_PURPOSE:-}" && -n "${WRAPPER_DEFAULT_ACCESS:-}" ]] \
+    || fatal "Vault naming library is incomplete: $_lib (needs vault_name, WRAPPER_DEFAULT_PURPOSE and WRAPPER_DEFAULT_ACCESS)"
+}
+
 # Symlink mode: the invoked name is <tool>-<account> and every argument
 # belongs to the tool.
 configure_symlink() {
@@ -219,7 +304,9 @@ configure_symlink() {
   [[ "$_self" == *-* && -n "$_tool" && -n "$_account" ]] \
     || fatal "Invoked as '$_self'; expected <tool>-<account>"
 
-  _VAULT="${_account}-${_DEFAULT_PURPOSE}-${_ACCESS}"
+  load_naming_lib
+  _VAULT="$(vault_name "$_account" "$WRAPPER_DEFAULT_PURPOSE" \
+    "${AGENT_VAULT_WRAPPER_ACCESS:-$WRAPPER_DEFAULT_ACCESS}")"
   _CMD="$_tool"
   _CMD_ARGS=("$@")
   check_cmd

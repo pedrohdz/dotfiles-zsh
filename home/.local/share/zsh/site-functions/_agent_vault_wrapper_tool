@@ -1,0 +1,14 @@
+# Completion for <tool>-<account> symlinks to agent-vault-wrapper
+# (gh-drounin, ...): complete them as the underlying tool.
+#
+# Rewriting the first word is the point. Cobra-generated completion scripts
+# (gh, jira, ...) run "${words[1]} __complete", which would otherwise go
+# through the wrapper and start a vault session on every TAB press.
+#
+# Registered per symlink by
+# ~/.local/etc/zsh/config.d/810-agent-vault-wrapper-completion.zsh.
+
+# Strip any directory first so a path with dashes (./bin/gh-drounin,
+# ~/dev/src-foo/gh-drounin) still yields the tool name.
+words[1]=${${words[1]:t}%%-*}
+_normal

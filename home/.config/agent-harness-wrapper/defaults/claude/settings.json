@@ -1,7 +1,10 @@
 {
   "editorMode": "vim",
   "theme": "auto",
-  "statusLine": {"type": "command", "command": ""},
+  "statusLine": {
+    "type": "command",
+    "command": "/home/pedro/.local/bin/claude-status"
+  },
   "autoUpdatesChannel": "stable",
   "sandbox": {
     "enabled": true,
