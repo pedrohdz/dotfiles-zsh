@@ -89,7 +89,8 @@ starting with '#' are ignored. Files are parsed, never sourced.
 Environment:
   AGENT_VAULT_BIN          Path to the agent-vault binary.
                            Default: $_AGENT_VAULT_BIN
-  AGENT_VAULT_WRAPPER_DIR  Config directory; envs/common.env is read from it.
+  AGENT_VAULT_WRAPPER_DIR  Config directory. Its envs/ must exist (it may be
+                           empty); envs/common.env is read from it.
                            Default: $_WRAPPER_DIR
   AGENT_VAULT_WRAPPER_ACCESS
                            Access part of the vault name in symlink mode.
@@ -148,6 +149,13 @@ load_env_file() {
 load_env() {
   local _common="$_ENV_DIR/common.env"
   local _source
+
+  # A missing individual file is normal, but a missing directory means the
+  # install is incomplete (e.g. not yet relinked). Refuse to run: the command
+  # would otherwise start without its stub environment.
+  if [[ ! -d "$_ENV_DIR" ]]; then
+    fatal "Env directory not found: $_ENV_DIR (install the config, or set AGENT_VAULT_WRAPPER_DIR to a directory containing envs/)"
+  fi
 
   if [[ -f "$_common" ]]; then
     load_env_file "$_common"
