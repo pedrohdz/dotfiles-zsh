@@ -19,13 +19,17 @@ _ACCOUNT_RE='^[A-Za-z0-9_-][A-Za-z0-9._-]*$'
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
+_COMMAND=""
 _HARNESS=""
 _ACCOUNT=""
 _HARNESS_ARGS=()
 
-# Filled in by harness_lookup.
+# Filled in by resolve_account.
+_ACCOUNT_DIR=""
+
+# Filled in by harness_lookup (from the harness's harness_def_* function).
 _HARNESS_BIN=""
-_HARNESS_STATE_VAR=""
+_HARNESS_ENV=()
 
 
 # ---------------------------------------------------------------------------
@@ -49,6 +53,7 @@ print_status() {
 usage() {
   cat <<EOF
 Usage: ${0##*/} --run <harness> <account> [HARNESS_ARGS...]
+       ${0##*/} --init <harness> <account>
        <harness>-<account> [HARNESS_ARGS...]    (symlink mode, see below)
 
 Run an agent harness under a per-account state directory, through
@@ -66,12 +71,17 @@ Symlink mode:
   is for direct mode only.
     ln -s agent-harness-wrapper ~/.local/bin/claude-drounin
 
-The account directory must already exist. The environment for the harness is
-every stub in agent-vault-wrapper's envs/ (--env-all), then this script's own
-envs/*.env, then the state directory variable; later values win.
+The account directory must already exist; --init creates it. The environment
+for the harness is every stub in agent-vault-wrapper's envs/ (--env-all), then this script's own
+envs/*.env, then the harness's state variable(s); later values win.
+
+--init creates <state root>/accounts/<account>/<harness> (mode 700, with
+GNU install) and fails if it already exists. It does not start the harness:
+launch it afterwards and log in there, inside the vault.
 
 Options:
   --run <harness> <account> [ARGS...]   Launch the harness
+  --init <harness> <account>            Create the account's state directory
   --help, -h                            Show this help and exit
 
 Environment:
@@ -93,16 +103,28 @@ EOF
 # ---------------------------------------------------------------------------
 # Harness table
 # ---------------------------------------------------------------------------
-# Pinned binary paths: PATH resolution could pick a different install (a
-# system one ahead of the user's), so each harness names its own.
+# One harness_def_<name> function per harness, called with the account's state
+# directory. It sets:
+#   _HARNESS_BIN  pinned binary path: PATH resolution could pick a different
+#                 install (a system one ahead of the user's)
+#   _HARNESS_ENV  assignments (KEY=VALUE) that point the harness at the
+#                 state directory; a harness may need several
+harness_def_claude() {
+  _HARNESS_BIN="${AGENT_HARNESS_BIN:-${HOME}/.local/bin/claude}"
+  _HARNESS_ENV=("CLAUDE_CONFIG_DIR=$1")
+}
+
+# Call the harness's definition. The name is checked against a plain-word
+# pattern and the harness_def_ prefix keeps it from reaching any other
+# function in this script.
 harness_lookup() {
-  case "$_HARNESS" in
-    claude)
-      _HARNESS_BIN="${AGENT_HARNESS_BIN:-${HOME}/.local/bin/claude}"
-      _HARNESS_STATE_VAR=CLAUDE_CONFIG_DIR ;;
-    *)
-      fatal "Unknown harness '$_HARNESS' (known: claude)" ;;
-  esac
+  local _state_dir="$1"
+
+  if [[ ! "$_HARNESS" =~ ^[a-z][a-z0-9]*$ ]] \
+    || ! declare -F "harness_def_$_HARNESS" >/dev/null; then
+    fatal "Unknown harness '$_HARNESS' (known: claude)"
+  fi
+  "harness_def_$_HARNESS" "$_state_dir"
 }
 
 
@@ -113,8 +135,15 @@ configure() {
   case "${1:-}" in
     -h|--help)
       usage; exit 0 ;;
+    --init)
+      [[ $# -ge 3 ]] || fatal "--init requires a harness and an account"
+      [[ $# -eq 3 ]] || fatal "--init takes no arguments after the account"
+      _COMMAND=init
+      _HARNESS="$2"
+      _ACCOUNT="$3" ;;
     --run)
       [[ $# -ge 3 ]] || fatal "--run requires a harness and an account"
+      _COMMAND=run
       _HARNESS="$2"
       _ACCOUNT="$3"
       shift 3
@@ -122,7 +151,7 @@ configure() {
     -*)
       fatal "Unknown option: $1" ;;
     *)
-      fatal "Unexpected argument: $1 (use --run <harness> <account>)" ;;
+      fatal "Unexpected argument: $1 (use --run or --init with <harness> <account>)" ;;
   esac
 }
 
@@ -134,6 +163,7 @@ configure_symlink() {
   [[ "$_self" == *-* && -n "${_self%%-*}" && -n "${_self#*-}" ]] \
     || fatal "Invoked as '$_self'; expected <harness>-<account>"
 
+  _COMMAND=run
   _HARNESS="${_self%%-*}"
   _ACCOUNT="${_self#*-}"
   _HARNESS_ARGS=("$@")
@@ -167,24 +197,57 @@ load_naming_lib() {
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
-cmd_run() {
-  local _env_dir="$_HARNESS_DIR/envs"
-  local _env_file
-  local _account_dir
-  local _vault
-  local _file_args=()
+# Validate the harness, the account and the state root, and set _ACCOUNT_DIR
+# and the harness's definition variables.
+resolve_account() {
   local LC_ALL=C
-
-  harness_lookup
 
   [[ "$_ACCOUNT" =~ $_ACCOUNT_RE ]] \
     || fatal "Invalid account '$_ACCOUNT' (letters, digits, '.', '_', '-'; may not start with '.')"
   [[ "$_STATE_DIR" == /* ]] \
     || fatal "State root must be an absolute path: $_STATE_DIR"
 
-  _account_dir="$_STATE_DIR/accounts/$_ACCOUNT/$_HARNESS"
-  [[ -d "$_account_dir" ]] \
-    || fatal "No $_HARNESS state for account '$_ACCOUNT' at $_account_dir (create it first)"
+  _ACCOUNT_DIR="$_STATE_DIR/accounts/$_ACCOUNT/$_HARNESS"
+  harness_lookup "$_ACCOUNT_DIR"
+}
+
+cmd_init() {
+  local _dir
+  local _vault
+
+  resolve_account
+  # install -d succeeds on an existing directory, so refuse first.
+  [[ ! -e "$_ACCOUNT_DIR" ]] \
+    || fatal "Already exists: $_ACCOUNT_DIR (nothing changed)"
+  # -m applies to the last component only, so each missing level is created
+  # on its own to keep all of them private.
+  [[ "$(install --version 2>&1)" == *GNU* ]] \
+    || fatal "GNU install is required"
+  load_naming_lib
+  _vault="$(vault_name "$_ACCOUNT" "$VAULT_PURPOSE_AGENT" "$VAULT_ACCESS_READONLY")"
+
+  for _dir in "$_STATE_DIR" "$_STATE_DIR/accounts" \
+              "$_STATE_DIR/accounts/$_ACCOUNT" "$_ACCOUNT_DIR"; do
+    [[ -d "$_dir" ]] || install -d -m 700 "$_dir"
+  done
+
+  echo "Created: $_ACCOUNT_DIR" >&2
+  echo "Next: run ${_HARNESS}-${_ACCOUNT} (or ${0##*/} --run ${_HARNESS} ${_ACCOUNT}) and log in." >&2
+  echo "It launches under vault '$_vault'." >&2
+}
+
+cmd_run() {
+  local _env_dir="$_HARNESS_DIR/envs"
+  local _env_file
+  local _vault
+  local _file_args=()
+  local _state_args=()
+  local _assignment
+  local LC_ALL=C
+
+  resolve_account
+  [[ -d "$_ACCOUNT_DIR" ]] \
+    || fatal "No $_HARNESS state for account '$_ACCOUNT' at $_ACCOUNT_DIR (create it with: ${0##*/} --init $_HARNESS $_ACCOUNT)"
 
   # A missing directory means the install is incomplete; refuse to run
   # rather than start the harness without its environment.
@@ -205,12 +268,16 @@ cmd_run() {
   done
   shopt -u nullglob
 
-  print_status "$_account_dir"
+  for _assignment in "${_HARNESS_ENV[@]}"; do
+    _state_args+=(--env "$_assignment")
+  done
+
+  print_status "$_ACCOUNT_DIR"
   exec "$_WRAPPER_BIN" \
     --vault "$_vault" \
     --env-all \
     ${_file_args[@]+"${_file_args[@]}"} \
-    --env "${_HARNESS_STATE_VAR}=${_account_dir}" \
+    "${_state_args[@]}" \
     -- "$_HARNESS_BIN" ${_HARNESS_ARGS[@]+"${_HARNESS_ARGS[@]}"}
 }
 
@@ -224,4 +291,8 @@ else
   [[ $# -gt 0 ]] || { usage >&2; exit 1; }
   configure "$@"
 fi
-cmd_run
+
+case "$_COMMAND" in
+  init) cmd_init ;;
+  run)  cmd_run ;;
+esac
