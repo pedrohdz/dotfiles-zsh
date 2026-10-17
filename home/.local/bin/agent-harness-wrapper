@@ -49,6 +49,7 @@ print_status() {
 usage() {
   cat <<EOF
 Usage: ${0##*/} --run <harness> <account> [HARNESS_ARGS...]
+       <harness>-<account> [HARNESS_ARGS...]    (symlink mode, see below)
 
 Run an agent harness under a per-account state directory, through
 agent-vault-wrapper, on the account's read-only agent vault. Every argument
@@ -57,6 +58,13 @@ after <account> goes to the harness untouched, including --help.
 Harnesses:
   claude    state in <state root>/accounts/<account>/claude, passed to the
             harness as CLAUDE_CONFIG_DIR
+
+Symlink mode:
+  Invoked through a symlink named <harness>-<account>, the script runs that
+  harness for that account with every argument passed through untouched. It
+  parses no flags of its own there, so --help reaches the harness; this help
+  is for direct mode only.
+    ln -s agent-harness-wrapper ~/.local/bin/claude-drounin
 
 The account directory must already exist. The environment for the harness is
 every stub in agent-vault-wrapper's envs/ (--env-all), then this script's own
@@ -116,6 +124,27 @@ configure() {
     *)
       fatal "Unexpected argument: $1 (use --run <harness> <account>)" ;;
   esac
+}
+
+# Symlink mode: the invoked name is <harness>-<account> and every argument
+# belongs to the harness.
+configure_symlink() {
+  local _self="${0##*/}"
+
+  [[ "$_self" == *-* && -n "${_self%%-*}" && -n "${_self#*-}" ]] \
+    || fatal "Invoked as '$_self'; expected <harness>-<account>"
+
+  _HARNESS="${_self%%-*}"
+  _ACCOUNT="${_self#*-}"
+  _HARNESS_ARGS=("$@")
+}
+
+# Symlink mode is when the script runs under a name other than its own. If
+# the real path can't be resolved, fall back to direct mode.
+is_symlink_invocation() {
+  local _real
+  _real="$(readlink -f "$0" 2>/dev/null)" || return 1
+  [[ "${0##*/}" != "${_real##*/}" ]]
 }
 
 # Source the shared vault-naming library, refusing to continue if it is
@@ -189,6 +218,10 @@ cmd_run() {
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
-[[ $# -gt 0 ]] || { usage >&2; exit 1; }
-configure "$@"
+if is_symlink_invocation; then
+  configure_symlink "$@"
+else
+  [[ $# -gt 0 ]] || { usage >&2; exit 1; }
+  configure "$@"
+fi
 cmd_run
