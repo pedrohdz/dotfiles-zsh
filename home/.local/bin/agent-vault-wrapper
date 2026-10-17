@@ -5,8 +5,14 @@ set -o errexit
 set -o nounset
 
 _WRAPPER_DIR="${AGENT_VAULT_WRAPPER_DIR:-${HOME}/.local/share/agent-vault-wrapper}"
-_ENV_DIR="${_WRAPPER_DIR}/env.d"
+_ENV_DIR="${_WRAPPER_DIR}/envs"
 _AGENT_VAULT_BIN="${AGENT_VAULT_BIN:-agent-vault}"
+
+# Symlink mode names the vault <account>-<purpose>-<access>. Stopgap: borrow
+# the read-only agent vaults until user/full vaults exist, then flip these.
+_DEFAULT_PURPOSE=agent
+_DEFAULT_ACCESS=read-only
+_ACCESS="${AGENT_VAULT_WRAPPER_ACCESS:-$_DEFAULT_ACCESS}"
 
 _BLANK_OR_COMMENT_RE='^[[:space:]]*(#|$)'
 _VAR_NAME_RE='^[A-Za-z_][A-Za-z0-9_]*$'
@@ -54,18 +60,27 @@ usage() {
   cat <<EOF
 Usage: ${0##*/} --vault <name> [--env KEY=VALUE]... [--env-file PATH]... \\
            -- <cmd> [args...]
+       <tool>-<account> [TOOL_ARGS...]    (symlink mode, see below)
 
 Run a command under an Agent Vault session scoped to a vault, with extra
 environment variables set for the wrapped command only.
 
-Options:
+Symlink mode:
+  Invoked through a symlink named <tool>-<account>, the wrapper runs <tool>
+  with every argument passed through untouched. It parses no flags of its
+  own there, so --help reaches the tool; this help is for direct mode only.
+  The vault is <account>-<purpose>-<access> (currently ${_DEFAULT_PURPOSE}-${_DEFAULT_ACCESS}),
+  and envs/<tool>.env is loaded after common.env if it exists.
+    ln -s agent-vault-wrapper ~/.local/bin/gh-outnordic
+
+Options (direct mode):
   --vault <name>      Vault to scope the session to (required)
   --env KEY=VALUE     Set a variable for the command (repeatable)
   --env-file <path>   Load KEY=VALUE lines from a file (repeatable)
   --help, -h          Show this help and exit
 
 Variables apply in order, later values overriding earlier ones (with a
-warning): env.d/common.env first, then --env and --env-file as given.
+warning): envs/common.env first, then --env and --env-file as given.
 
 Env file format: one KEY=VALUE per line. The value is everything after the
 first '=', taken literally (no quotes, no expansion). Blank lines and lines
@@ -74,8 +89,11 @@ starting with '#' are ignored. Files are parsed, never sourced.
 Environment:
   AGENT_VAULT_BIN          Path to the agent-vault binary.
                            Default: $_AGENT_VAULT_BIN
-  AGENT_VAULT_WRAPPER_DIR  Data directory; env.d/common.env is read from it.
+  AGENT_VAULT_WRAPPER_DIR  Data directory; envs/common.env is read from it.
                            Default: $_WRAPPER_DIR
+  AGENT_VAULT_WRAPPER_ACCESS
+                           Access part of the vault name in symlink mode.
+                           Default: $_DEFAULT_ACCESS
 EOF
 }
 
@@ -147,6 +165,12 @@ load_env() {
 # ---------------------------------------------------------------------------
 # Argument parsing
 # ---------------------------------------------------------------------------
+# env(1) would read these as its own options or assignments.
+check_cmd() {
+  [[ "$_CMD" != -* ]] || fatal "Command may not start with '-': $_CMD"
+  [[ "$_CMD" != *=* ]] || fatal "Command may not contain '=': $_CMD"
+}
+
 configure() {
   while (( $# )); do
     case "$1" in
@@ -182,10 +206,35 @@ configure() {
   _CMD="$1"
   shift
   _CMD_ARGS=("$@")
+  check_cmd
+}
 
-  # env(1) would read these as its own options or assignments.
-  [[ "$_CMD" != -* ]] || fatal "Command may not start with '-': $_CMD"
-  [[ "$_CMD" != *=* ]] || fatal "Command may not contain '=': $_CMD"
+# Symlink mode: the invoked name is <tool>-<account> and every argument
+# belongs to the tool.
+configure_symlink() {
+  local _self="${0##*/}"
+  local _tool="${_self%%-*}"
+  local _account="${_self#*-}"
+
+  [[ "$_self" == *-* && -n "$_tool" && -n "$_account" ]] \
+    || fatal "Invoked as '$_self'; expected <tool>-<account>"
+
+  _VAULT="${_account}-${_DEFAULT_PURPOSE}-${_ACCESS}"
+  _CMD="$_tool"
+  _CMD_ARGS=("$@")
+  check_cmd
+
+  if [[ -f "$_ENV_DIR/$_tool.env" ]]; then
+    _SOURCES+=("file:$_ENV_DIR/$_tool.env")
+  fi
+}
+
+# Symlink mode is when the script runs under a name other than its own. If
+# the real path can't be resolved, fall back to direct mode.
+is_symlink_invocation() {
+  local _real
+  _real="$(readlink -f "$0" 2>/dev/null)" || return 1
+  [[ "${0##*/}" != "${_real##*/}" ]]
 }
 
 
@@ -208,6 +257,10 @@ cmd_run() {
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
-[[ $# -gt 0 ]] || { usage >&2; exit 1; }
-configure "$@"
+if is_symlink_invocation; then
+  configure_symlink "$@"
+else
+  [[ $# -gt 0 ]] || { usage >&2; exit 1; }
+  configure "$@"
+fi
 cmd_run
