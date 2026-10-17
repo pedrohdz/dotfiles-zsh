@@ -5,7 +5,7 @@ set -o errexit
 set -o nounset
 
 _WRAPPER_DIR="${AGENT_VAULT_WRAPPER_DIR:-${HOME}/.local/share/agent-vault-wrapper}"
-_ENV_DIR="${_WRAPPER_DIR}/env.d"
+_ENV_DIR="${_WRAPPER_DIR}/envs"
 _AGENT_VAULT_BIN="${AGENT_VAULT_BIN:-agent-vault}"
 
 # Symlink mode names the vault <account>-<purpose>-<access>. Stopgap: borrow
@@ -70,7 +70,7 @@ Symlink mode:
   with every argument passed through untouched. It parses no flags of its
   own there, so --help reaches the tool; this help is for direct mode only.
   The vault is <account>-<purpose>-<access> (currently ${_DEFAULT_PURPOSE}-${_DEFAULT_ACCESS}),
-  and env.d/<tool>.env is loaded after common.env if it exists.
+  and envs/<tool>.env is loaded after common.env if it exists.
     ln -s agent-vault-wrapper ~/.local/bin/gh-outnordic
 
 Options (direct mode):
@@ -80,7 +80,7 @@ Options (direct mode):
   --help, -h          Show this help and exit
 
 Variables apply in order, later values overriding earlier ones (with a
-warning): env.d/common.env first, then --env and --env-file as given.
+warning): envs/common.env first, then --env and --env-file as given.
 
 Env file format: one KEY=VALUE per line. The value is everything after the
 first '=', taken literally (no quotes, no expansion). Blank lines and lines
@@ -89,7 +89,7 @@ starting with '#' are ignored. Files are parsed, never sourced.
 Environment:
   AGENT_VAULT_BIN          Path to the agent-vault binary.
                            Default: $_AGENT_VAULT_BIN
-  AGENT_VAULT_WRAPPER_DIR  Data directory; env.d/common.env is read from it.
+  AGENT_VAULT_WRAPPER_DIR  Data directory; envs/common.env is read from it.
                            Default: $_WRAPPER_DIR
   AGENT_VAULT_WRAPPER_ACCESS
                            Access part of the vault name in symlink mode.
