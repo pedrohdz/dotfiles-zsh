@@ -1,0 +1,194 @@
+#! /usr/bin/env bash
+
+set -o pipefail
+set -o errexit
+set -o nounset
+
+_HARNESS_DIR="${AGENT_HARNESS_WRAPPER_DIR:-${HOME}/.config/agent-harness-wrapper}"
+_STATE_DIR="${AGENT_HARNESS_WRAPPER_STATE_DIR:-${HOME}/.agent-harness-wrapper}"
+_WRAPPER_BIN="${AGENT_VAULT_WRAPPER_BIN:-${HOME}/.local/bin/agent-vault-wrapper}"
+
+# Vault naming (<account>-<purpose>-<access>) lives in a library shared with
+# agent-vault-wrapper.
+_LIB_DIR="${AGENT_VAULT_WRAPPER_LIB:-${HOME}/.local/lib/agent-vault-wrapper}"
+
+# Account names become a directory name and part of a vault name.
+_ACCOUNT_RE='^[A-Za-z0-9_-][A-Za-z0-9._-]*$'
+
+
+# ---------------------------------------------------------------------------
+# State
+# ---------------------------------------------------------------------------
+_HARNESS=""
+_ACCOUNT=""
+_HARNESS_ARGS=()
+
+# Filled in by harness_lookup.
+_HARNESS_BIN=""
+_HARNESS_STATE_VAR=""
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+fatal() {
+  echo "FATAL - $*" >&2
+  exit 1
+}
+
+print_status() {
+  local _dir="$1"
+  if [[ -t 2 ]]; then
+    printf '\033[1m%s\033[0m: \033[36m%s\033[0m %s → \033[36m%s\033[0m\n' \
+      "${0##*/}" "$_HARNESS" "$_ACCOUNT" "$_dir" >&2
+  else
+    printf '%s: %s %s → %s\n' "${0##*/}" "$_HARNESS" "$_ACCOUNT" "$_dir" >&2
+  fi
+}
+
+usage() {
+  cat <<EOF
+Usage: ${0##*/} --run <harness> <account> [HARNESS_ARGS...]
+
+Run an agent harness under a per-account state directory, through
+agent-vault-wrapper, on the account's read-only agent vault. Every argument
+after <account> goes to the harness untouched, including --help.
+
+Harnesses:
+  claude    state in <state root>/accounts/<account>/claude, passed to the
+            harness as CLAUDE_CONFIG_DIR
+
+The account directory must already exist. The environment for the harness is
+every stub in agent-vault-wrapper's envs/ (--env-all), then this script's own
+envs/*.env, then the state directory variable; later values win.
+
+Options:
+  --run <harness> <account> [ARGS...]   Launch the harness
+  --help, -h                            Show this help and exit
+
+Environment:
+  AGENT_HARNESS_WRAPPER_DIR        Config directory. Its envs/ must exist (it
+                                   may be empty).
+                                   Default: $_HARNESS_DIR
+  AGENT_HARNESS_WRAPPER_STATE_DIR  State root; must be an absolute path.
+                                   Default: $_STATE_DIR
+  AGENT_HARNESS_BIN                Path to the harness binary, replacing the
+                                   pinned one (for tests).
+  AGENT_VAULT_WRAPPER_BIN          Path to agent-vault-wrapper.
+                                   Default: $_WRAPPER_BIN
+  AGENT_VAULT_WRAPPER_LIB          Directory holding vault-naming.sh.
+                                   Default: $_LIB_DIR
+EOF
+}
+
+
+# ---------------------------------------------------------------------------
+# Harness table
+# ---------------------------------------------------------------------------
+# Pinned binary paths: PATH resolution could pick a different install (a
+# system one ahead of the user's), so each harness names its own.
+harness_lookup() {
+  case "$_HARNESS" in
+    claude)
+      _HARNESS_BIN="${AGENT_HARNESS_BIN:-${HOME}/.local/bin/claude}"
+      _HARNESS_STATE_VAR=CLAUDE_CONFIG_DIR ;;
+    *)
+      fatal "Unknown harness '$_HARNESS' (known: claude)" ;;
+  esac
+}
+
+
+# ---------------------------------------------------------------------------
+# Argument parsing
+# ---------------------------------------------------------------------------
+configure() {
+  case "${1:-}" in
+    -h|--help)
+      usage; exit 0 ;;
+    --run)
+      [[ $# -ge 3 ]] || fatal "--run requires a harness and an account"
+      _HARNESS="$2"
+      _ACCOUNT="$3"
+      shift 3
+      _HARNESS_ARGS=("$@") ;;
+    -*)
+      fatal "Unknown option: $1" ;;
+    *)
+      fatal "Unexpected argument: $1 (use --run <harness> <account>)" ;;
+  esac
+}
+
+# Source the shared vault-naming library, refusing to continue if it is
+# missing or incomplete: a wrong or empty vault name must never reach
+# agent-vault.
+load_naming_lib() {
+  local _lib="$_LIB_DIR/vault-naming.sh"
+
+  [[ -f "$_lib" ]] \
+    || fatal "Vault naming library not found: $_lib (install the config, or set AGENT_VAULT_WRAPPER_LIB to a directory containing vault-naming.sh)"
+  # shellcheck source-path=SCRIPTDIR
+  # shellcheck source=../lib/agent-vault-wrapper/vault-naming.sh
+  source "$_lib"
+  declare -F vault_name >/dev/null \
+    && [[ -n "${VAULT_PURPOSE_AGENT:-}" && -n "${VAULT_ACCESS_READONLY:-}" ]] \
+    || fatal "Vault naming library is incomplete: $_lib (needs vault_name, VAULT_PURPOSE_AGENT and VAULT_ACCESS_READONLY)"
+}
+
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+cmd_run() {
+  local _env_dir="$_HARNESS_DIR/envs"
+  local _env_file
+  local _account_dir
+  local _vault
+  local _file_args=()
+  local LC_ALL=C
+
+  harness_lookup
+
+  [[ "$_ACCOUNT" =~ $_ACCOUNT_RE ]] \
+    || fatal "Invalid account '$_ACCOUNT' (letters, digits, '.', '_', '-'; may not start with '.')"
+  [[ "$_STATE_DIR" == /* ]] \
+    || fatal "State root must be an absolute path: $_STATE_DIR"
+
+  _account_dir="$_STATE_DIR/accounts/$_ACCOUNT/$_HARNESS"
+  [[ -d "$_account_dir" ]] \
+    || fatal "No $_HARNESS state for account '$_ACCOUNT' at $_account_dir (create it first)"
+
+  # A missing directory means the install is incomplete; refuse to run
+  # rather than start the harness without its environment.
+  [[ -d "$_env_dir" ]] \
+    || fatal "Env directory not found: $_env_dir (install the config, or set AGENT_HARNESS_WRAPPER_DIR to a directory containing envs/)"
+
+  [[ -x "$_WRAPPER_BIN" ]] \
+    || fatal "agent-vault-wrapper not found or not executable: $_WRAPPER_BIN"
+  command -v "$_HARNESS_BIN" >/dev/null 2>&1 \
+    || fatal "$_HARNESS binary not found: $_HARNESS_BIN"
+
+  load_naming_lib
+  _vault="$(vault_name "$_ACCOUNT" "$VAULT_PURPOSE_AGENT" "$VAULT_ACCESS_READONLY")"
+
+  shopt -s nullglob
+  for _env_file in "$_env_dir"/*.env; do
+    _file_args+=(--env-file "$_env_file")
+  done
+  shopt -u nullglob
+
+  print_status "$_account_dir"
+  exec "$_WRAPPER_BIN" \
+    --vault "$_vault" \
+    --env-all \
+    ${_file_args[@]+"${_file_args[@]}"} \
+    --env "${_HARNESS_STATE_VAR}=${_account_dir}" \
+    -- "$_HARNESS_BIN" ${_HARNESS_ARGS[@]+"${_HARNESS_ARGS[@]}"}
+}
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+[[ $# -gt 0 ]] || { usage >&2; exit 1; }
+configure "$@"
+cmd_run
