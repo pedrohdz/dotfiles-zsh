@@ -8,11 +8,9 @@ _WRAPPER_DIR="${AGENT_VAULT_WRAPPER_DIR:-${HOME}/.config/agent-vault-wrapper}"
 _ENV_DIR="${_WRAPPER_DIR}/envs"
 _AGENT_VAULT_BIN="${AGENT_VAULT_BIN:-agent-vault}"
 
-# Symlink mode names the vault <account>-<purpose>-<access>. Stopgap: borrow
-# the read-only agent vaults until user/full vaults exist, then flip these.
-_DEFAULT_PURPOSE=agent
-_DEFAULT_ACCESS=read-only
-_ACCESS="${AGENT_VAULT_WRAPPER_ACCESS:-$_DEFAULT_ACCESS}"
+# Vault naming (<account>-<purpose>-<access>) lives in a library shared with
+# agent-harness-wrapper. Only symlink mode builds a name, so only it loads it.
+_LIB_DIR="${AGENT_VAULT_WRAPPER_LIB:-${HOME}/.local/lib/agent-vault-wrapper}"
 
 _BLANK_OR_COMMENT_RE='^[[:space:]]*(#|$)'
 _VAR_NAME_RE='^[A-Za-z_][A-Za-z0-9_]*$'
@@ -73,8 +71,9 @@ Symlink mode:
   Invoked through a symlink named <tool>-<account>, the wrapper runs <tool>
   with every argument passed through untouched. It parses no flags of its
   own there, so --help reaches the tool; this help is for direct mode only.
-  The vault is <account>-<purpose>-<access> (currently ${_DEFAULT_PURPOSE}-${_DEFAULT_ACCESS}),
-  and envs/<tool>.env is loaded after common.env if it exists.
+  The vault is <account>-<purpose>-<access>; vault-naming.sh sets the purpose
+  and the default access, and AGENT_VAULT_WRAPPER_ACCESS overrides the access.
+  envs/<tool>.env is loaded after common.env if it exists.
     ln -s agent-vault-wrapper ~/.local/bin/gh-drounin
 
 Options (direct mode):
@@ -102,7 +101,9 @@ Environment:
                            Default: $_WRAPPER_DIR
   AGENT_VAULT_WRAPPER_ACCESS
                            Access part of the vault name in symlink mode.
-                           Default: $_DEFAULT_ACCESS
+                           Default: WRAPPER_DEFAULT_ACCESS in vault-naming.sh
+  AGENT_VAULT_WRAPPER_LIB  Directory holding vault-naming.sh (symlink mode).
+                           Default: $_LIB_DIR
 EOF
 }
 
@@ -248,6 +249,22 @@ configure() {
   check_cmd
 }
 
+# Source the shared vault-naming library, refusing to continue if it is
+# missing or incomplete: a wrong or empty vault name must never reach
+# agent-vault.
+load_naming_lib() {
+  local _lib="$_LIB_DIR/vault-naming.sh"
+
+  [[ -f "$_lib" ]] \
+    || fatal "Vault naming library not found: $_lib (install the config, or set AGENT_VAULT_WRAPPER_LIB to a directory containing vault-naming.sh)"
+  # shellcheck source-path=SCRIPTDIR
+  # shellcheck source=../lib/agent-vault-wrapper/vault-naming.sh
+  source "$_lib"
+  declare -F vault_name >/dev/null \
+    && [[ -n "${WRAPPER_DEFAULT_PURPOSE:-}" && -n "${WRAPPER_DEFAULT_ACCESS:-}" ]] \
+    || fatal "Vault naming library is incomplete: $_lib (needs vault_name, WRAPPER_DEFAULT_PURPOSE and WRAPPER_DEFAULT_ACCESS)"
+}
+
 # Symlink mode: the invoked name is <tool>-<account> and every argument
 # belongs to the tool.
 configure_symlink() {
@@ -258,7 +275,9 @@ configure_symlink() {
   [[ "$_self" == *-* && -n "$_tool" && -n "$_account" ]] \
     || fatal "Invoked as '$_self'; expected <tool>-<account>"
 
-  _VAULT="${_account}-${_DEFAULT_PURPOSE}-${_ACCESS}"
+  load_naming_lib
+  _VAULT="$(vault_name "$_account" "$WRAPPER_DEFAULT_PURPOSE" \
+    "${AGENT_VAULT_WRAPPER_ACCESS:-$WRAPPER_DEFAULT_ACCESS}")"
   _CMD="$_tool"
   _CMD_ARGS=("$@")
   check_cmd
