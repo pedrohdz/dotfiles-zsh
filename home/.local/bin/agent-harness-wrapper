@@ -84,7 +84,8 @@ Symlink mode:
 
 The account directory must already exist; --init creates it. The environment
 for the harness is every stub in agent-vault-wrapper's envs/ (--env-all), then this script's own
-envs/*.env, then the harness's state variable(s); later values win.
+envs/*.env, then AGENT_HARNESS_ACCOUNT (the account name) and the harness's
+state variable(s); later values win.
 
 --init creates <state root>/accounts/<account>/<harness> (mode 700, with
 GNU install) and fails if it already exists. It does not start the harness:
@@ -403,6 +404,9 @@ cmd_run() {
   done
   shopt -u nullglob
 
+  # The account name, for tools that cannot derive it from the state path
+  # (claude-status).
+  _state_args+=(--env "AGENT_HARNESS_ACCOUNT=$_ACCOUNT")
   for _assignment in "${_HARNESS_ENV[@]}"; do
     _state_args+=(--env "$_assignment")
   done
