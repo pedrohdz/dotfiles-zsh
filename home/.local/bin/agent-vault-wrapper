@@ -16,6 +16,9 @@ _ACCESS="${AGENT_VAULT_WRAPPER_ACCESS:-$_DEFAULT_ACCESS}"
 
 _BLANK_OR_COMMENT_RE='^[[:space:]]*(#|$)'
 _VAR_NAME_RE='^[A-Za-z_][A-Za-z0-9_]*$'
+# Canonical --env-name: '/'-separated components, each non-empty and not
+# starting with '.', so a valid name always normalizes to itself.
+_ENV_NAME_RE='^[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$'
 
 
 # ---------------------------------------------------------------------------
@@ -25,8 +28,9 @@ _VAULT=""
 _CMD=""
 _CMD_ARGS=()
 
-# --env / --env-file flags in the order given, as "env:KEY=VALUE" or
-# "file:PATH". Applied after parsing so common.env always loads first.
+# --env / --env-file / --env-name flags in the order given, as "env:KEY=VALUE",
+# "file:PATH" or "name:NAME". Applied after parsing so common.env always loads
+# first.
 _SOURCES=()
 
 # Merged environment for the wrapped command. _ENV_KEYS runs parallel to
@@ -59,7 +63,7 @@ print_status() {
 usage() {
   cat <<EOF
 Usage: ${0##*/} --vault <name> [--env KEY=VALUE]... [--env-file PATH]... \\
-           -- <cmd> [args...]
+           [--env-name NAME]... -- <cmd> [args...]
        <tool>-<account> [TOOL_ARGS...]    (symlink mode, see below)
 
 Run a command under an Agent Vault session scoped to a vault, with extra
@@ -77,10 +81,14 @@ Options (direct mode):
   --vault <name>      Vault to scope the session to (required)
   --env KEY=VALUE     Set a variable for the command (repeatable)
   --env-file <path>   Load KEY=VALUE lines from a file (repeatable)
+  --env-name NAME     Load envs/NAME.env from the config dir (repeatable);
+                      NAME may include subdirectories (acct/jira) and must be
+                      canonical: no '.', '..', '//' or leading/trailing '/'
   --help, -h          Show this help and exit
 
 Variables apply in order, later values overriding earlier ones (with a
-warning): envs/common.env first, then --env and --env-file as given.
+warning): envs/common.env first, then --env, --env-file and --env-name as
+given.
 
 Env file format: one KEY=VALUE per line. The value is everything after the
 first '=', taken literally (no quotes, no expansion). Blank lines and lines
@@ -146,6 +154,23 @@ load_env_file() {
   done < "$_file"
 }
 
+# --env-name NAME loads envs/NAME.env from the config directory. NAME may
+# include subdirectories (<account>/jira) but must already be in canonical
+# form: anything a path normalizer would change (., .., //, a leading or
+# trailing /) is rejected, so a name cannot smuggle in a different path.
+load_env_name() {
+  local _name="$1"
+  local _path="$_ENV_DIR/$_name.env"
+  # Ranges like A-Z follow the locale's collation order and can match accented
+  # letters; match bytewise so the grammar means plain ASCII.
+  local LC_ALL=C
+
+  [[ "$_name" =~ $_ENV_NAME_RE ]] \
+    || fatal "Invalid --env-name '$_name' (letters, digits, '.', '_', '-', with '/' between non-empty components; a component may not start with '.')"
+  [[ -f "$_path" ]] || fatal "No env file named '$_name': $_path"
+  load_env_file "$_path"
+}
+
 load_env() {
   local _common="$_ENV_DIR/common.env"
   local _source
@@ -165,6 +190,7 @@ load_env() {
     case "$_source" in
       env:*)  add_env "${_source#env:}" ;;
       file:*) load_env_file "${_source#file:}" ;;
+      name:*) load_env_name "${_source#name:}" ;;
     esac
   done
 }
@@ -199,6 +225,11 @@ configure() {
         _SOURCES+=("file:$2"); shift 2 ;;
       --env-file=*)
         _SOURCES+=("file:${1#--env-file=}"); shift ;;
+      --env-name)
+        [[ $# -ge 2 ]] || fatal "--env-name requires a name"
+        _SOURCES+=("name:$2"); shift 2 ;;
+      --env-name=*)
+        _SOURCES+=("name:${1#--env-name=}"); shift ;;
       --)
         shift; break ;;
       -*)
