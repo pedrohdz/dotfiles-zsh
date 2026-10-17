@@ -4,7 +4,7 @@ set -o pipefail
 set -o errexit
 set -o nounset
 
-_WRAPPER_DIR="${AGENT_VAULT_WRAPPER_DIR:-${HOME}/.local/share/agent-vault-wrapper}"
+_WRAPPER_DIR="${AGENT_VAULT_WRAPPER_DIR:-${HOME}/.config/agent-vault-wrapper}"
 _ENV_DIR="${_WRAPPER_DIR}/envs"
 _AGENT_VAULT_BIN="${AGENT_VAULT_BIN:-agent-vault}"
 
@@ -89,7 +89,7 @@ starting with '#' are ignored. Files are parsed, never sourced.
 Environment:
   AGENT_VAULT_BIN          Path to the agent-vault binary.
                            Default: $_AGENT_VAULT_BIN
-  AGENT_VAULT_WRAPPER_DIR  Data directory; envs/common.env is read from it.
+  AGENT_VAULT_WRAPPER_DIR  Config directory; envs/common.env is read from it.
                            Default: $_WRAPPER_DIR
   AGENT_VAULT_WRAPPER_ACCESS
                            Access part of the vault name in symlink mode.
