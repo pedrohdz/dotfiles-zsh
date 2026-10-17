@@ -71,7 +71,7 @@ Symlink mode:
   own there, so --help reaches the tool; this help is for direct mode only.
   The vault is <account>-<purpose>-<access> (currently ${_DEFAULT_PURPOSE}-${_DEFAULT_ACCESS}),
   and envs/<tool>.env is loaded after common.env if it exists.
-    ln -s agent-vault-wrapper ~/.local/bin/gh-outnordic
+    ln -s agent-vault-wrapper ~/.local/bin/gh-drounin
 
 Options (direct mode):
   --vault <name>      Vault to scope the session to (required)
