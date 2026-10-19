@@ -40,7 +40,9 @@
     },
     "filesystem": {
       "denyWrite": [
-        "~"
+        "~",
+        "**/secrets.auto.tfvars",
+        "**/secrets.auto.tfvars-*"
       ],
       "allowWrite": [
         "/data/dev",
@@ -49,6 +51,8 @@
       ],
       "denyRead": [
         "~",
+        "**/secrets.auto.tfvars",
+        "**/secrets.auto.tfvars-*",
         "~/.agent-harness-wrapper",
         "~/.agent-vault/session.json",
         "~/.homesick",
@@ -157,6 +161,8 @@
       "Bash(xclip *)",
       "Bash(xsel *)",
       "Bash(zellij *)",
+      "Edit(//**/secrets.auto.tfvars)",
+      "Edit(//**/secrets.auto.tfvars-*)",
       "Edit(~/.agent-harness-wrapper/accounts/*/claude/.credentials.json)",
       "Edit(~/.agent-harness-wrapper/accounts/*/claude/settings.json)",
       "Edit(~/.agent-vault/**)",
@@ -172,6 +178,8 @@
       "Edit(~/.local/lib/**)",
       "Edit(~/.password-store/**)",
       "Edit(~/.ssh/**)",
+      "Read(//**/secrets.auto.tfvars)",
+      "Read(//**/secrets.auto.tfvars-*)",
       "Read(~/.agent-harness-wrapper/accounts/*/claude/.credentials.json)",
       "Read(~/.agent-vault/session.json)",
       "Read(~/.aws/**)",
