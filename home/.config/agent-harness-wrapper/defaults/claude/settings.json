@@ -178,18 +178,26 @@
       "Edit(~/.local/lib/**)",
       "Edit(~/.password-store/**)",
       "Edit(~/.ssh/**)",
+      "Read(//**/*.tfstate)",
+      "Read(//**/*.tfstate.*)",
       "Read(//**/secrets.auto.tfvars)",
       "Read(//**/secrets.auto.tfvars-*)",
       "Read(~/.agent-harness-wrapper/accounts/*/claude/.credentials.json)",
+      "Read(~/.agent-harness-wrapper/accounts/*/claude/history.jsonl)",
       "Read(~/.agent-vault/session.json)",
       "Read(~/.aws/**)",
+      "Read(~/.bash_history)",
       "Read(~/.config/gh/**)",
       "Read(~/.config/github-copilot/**)",
       "Read(~/.gnupg/**)",
       "Read(~/.homesick/repos/*-private/**)",
       "Read(~/Library/Keychains/**)",
+      "Read(~/.local/share/opencode/**)",
+      "Read(~/.npmrc)",
       "Read(~/.password-store/**)",
-      "Read(~/.ssh/**)"
-    ]
+      "Read(~/.ssh/**)",
+      "Read(~/.zsh_history)"
+    ],
+    "disableBypassPermissionsMode": "disable"
   }
 }
