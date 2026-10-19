@@ -42,6 +42,10 @@ _ENV_KEYS=()
 _ENV_ARGS=()
 _ENV_ORIGINS=()
 
+# Symlink mode only: the envs/ names loaded, in order, for the status line.
+_SYMLINK=0
+_STATUS_ENVS=()
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -56,11 +60,15 @@ warn() {
 }
 
 print_status() {
+  local _envs=""
+  if (( _SYMLINK )); then
+    _envs=" (envs: ${_STATUS_ENVS[*]-none})"
+  fi
   if [[ -t 2 ]]; then
-    printf '\033[1m%s\033[0m: \033[36m%s\033[0m → \033[36m%s\033[0m\n' \
-      "${0##*/}" "$_VAULT" "$_CMD" >&2
+    printf '\033[1m%s\033[0m: \033[36m%s\033[0m → \033[36m%s\033[0m%s\n' \
+      "${0##*/}" "$_VAULT" "$_CMD" "$_envs" >&2
   else
-    printf '%s: %s → %s\n' "${0##*/}" "$_VAULT" "$_CMD" >&2
+    printf '%s: %s → %s%s\n' "${0##*/}" "$_VAULT" "$_CMD" "$_envs" >&2
   fi
 }
 
@@ -87,6 +95,7 @@ Symlink mode:
   lines and lines starting with '#' are ignored. For example tools/bash:
     gh
     git-https
+  The status line lists the env names loaded, in order.
 
 Options (direct mode):
   --vault <name>      Vault to scope the session to (required)
@@ -295,6 +304,7 @@ load_tool_manifest() {
       || fatal "$_file:$_lineno: no env file named '$_line': $_ENV_DIR/$_line.env"
     _seen+=("$_line")
     _SOURCES+=("file:$_ENV_DIR/$_line.env")
+    _STATUS_ENVS+=("$_line")
   done < "$_file"
 }
 
@@ -390,12 +400,17 @@ configure_symlink() {
   check_cmd
 
   # Shared envs from the manifest, then the tool's own, so its values come
-  # last while an overlap is being fixed.
+  # last while an overlap is being fixed. common.env loads first (load_env).
+  _SYMLINK=1
+  if [[ -f "$_ENV_DIR/common.env" ]]; then
+    _STATUS_ENVS+=(common)
+  fi
   if [[ -f "$_TOOLS_DIR/$_tool" ]]; then
     load_tool_manifest "$_TOOLS_DIR/$_tool" "$_tool"
   fi
   if [[ -f "$_ENV_DIR/$_tool.env" ]]; then
     _SOURCES+=("file:$_ENV_DIR/$_tool.env")
+    _STATUS_ENVS+=("$_tool")
   fi
 }
 

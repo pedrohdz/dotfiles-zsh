@@ -90,7 +90,20 @@ lines() {
   assert_run_succeeded
   expected_exec "$_VAULT" faketool C=1
   assert_run_stdout_equals "$REPLY"
-  lines "faketool-drounin: $_VAULT → faketool"
+  lines "faketool-drounin: $_VAULT → faketool (envs: common)"
+  assert_run_stderr_equals "$REPLY"
+}
+
+() {
+  test_description "Symlink mode, no env files at all: status line says none"
+  setup_each
+
+  avw "$_T/bin/faketool-drounin"
+
+  assert_run_succeeded
+  expected_exec "$_VAULT" faketool
+  assert_run_stdout_equals "$REPLY"
+  lines "faketool-drounin: $_VAULT → faketool (envs: none)"
   assert_run_stderr_equals "$REPLY"
 }
 
@@ -105,7 +118,7 @@ lines() {
   assert_run_succeeded
   REPLY="$(printf '%s\n' run --vault "$_VAULT" -- env C=1 T=1 faketool arg1)"$'\n'
   assert_run_stdout_equals "$REPLY"
-  lines "faketool-drounin: $_VAULT → faketool"
+  lines "faketool-drounin: $_VAULT → faketool (envs: common faketool)"
   assert_run_stderr_equals "$REPLY"
 }
 
@@ -124,7 +137,7 @@ lines() {
   assert_run_succeeded
   expected_exec "$_VAULT" faketool C=1 B=1 A=1 X=1 T=1
   assert_run_stdout_equals "$REPLY"
-  lines "faketool-drounin: $_VAULT → faketool"
+  lines "faketool-drounin: $_VAULT → faketool (envs: common b a sub/x faketool)"
   assert_run_stderr_equals "$REPLY"
 }
 
@@ -175,7 +188,7 @@ lines() {
     "WARN - $_T/config/tools/faketool:2: 'common' always loads; skipped" \
     "WARN - $_T/config/tools/faketool:3: 'faketool' always loads; skipped" \
     "WARN - $_T/config/tools/faketool:4: 'a' already listed; skipped" \
-    "faketool-drounin: $_VAULT → faketool"
+    "faketool-drounin: $_VAULT → faketool (envs: common a faketool)"
   assert_run_stderr_equals "$REPLY"
 }
 
@@ -209,7 +222,7 @@ lines() {
   assert_run_stdout_equals "$REPLY"
   lines \
     "WARN - K set in $_T/config/envs/common.env:1 and $_T/config/envs/a.env:1; using $_T/config/envs/a.env:1 (fix the config)" \
-    "faketool-drounin: $_VAULT → faketool"
+    "faketool-drounin: $_VAULT → faketool (envs: common a)"
   assert_run_stderr_equals "$REPLY"
 }
 
@@ -226,7 +239,7 @@ lines() {
   assert_run_stdout_equals "$REPLY"
   lines \
     "WARN - K set in $_T/config/envs/common.env:1 and $_T/config/envs/faketool.env:1; using $_T/config/envs/faketool.env:1 (fix the config)" \
-    "faketool-drounin: $_VAULT → faketool"
+    "faketool-drounin: $_VAULT → faketool (envs: common faketool)"
   assert_run_stderr_equals "$REPLY"
 }
 
