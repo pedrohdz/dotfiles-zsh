@@ -6,6 +6,7 @@ set -o nounset
 
 _WRAPPER_DIR="${AGENT_VAULT_WRAPPER_DIR:-${HOME}/.config/agent-vault-wrapper}"
 _ENV_DIR="${_WRAPPER_DIR}/envs"
+_TOOLS_DIR="${_WRAPPER_DIR}/tools"
 _AGENT_VAULT_BIN="${AGENT_VAULT_BIN:-agent-vault}"
 
 # Vault naming (<account>-<purpose>-<access>) lives in a library shared with
@@ -17,6 +18,9 @@ _VAR_NAME_RE='^[A-Za-z_][A-Za-z0-9_]*$'
 # Canonical --env-name: '/'-separated components, each non-empty and not
 # starting with '.', so a valid name always normalizes to itself.
 _ENV_NAME_RE='^[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$'
+# Symlink-mode tool name: it names tools/<tool> and envs/<tool>.env, so a plain
+# word that cannot reach another path.
+_TOOL_RE='^[A-Za-z0-9_][A-Za-z0-9._]*$'
 
 
 # ---------------------------------------------------------------------------
@@ -26,15 +30,17 @@ _VAULT=""
 _CMD=""
 _CMD_ARGS=()
 
-# --env / --env-file / --env-name flags in the order given, as "env:KEY=VALUE",
-# "file:PATH" or "name:NAME". Applied after parsing so common.env always loads
-# first.
+# --env / --env-file / --env-name / --env-all flags in the order given, as
+# "env:KEY=VALUE", "file:PATH", "name:NAME" or "all:". Applied after parsing so
+# common.env always loads first and --env always loads last.
 _SOURCES=()
 
-# Merged environment for the wrapped command. _ENV_KEYS runs parallel to
-# _ENV_ARGS so a later value can replace an earlier one.
+# Merged environment for the wrapped command. _ENV_KEYS and _ENV_ORIGINS run
+# parallel to _ENV_ARGS so a later value can replace an earlier one and the
+# warning can name both places.
 _ENV_KEYS=()
 _ENV_ARGS=()
+_ENV_ORIGINS=()
 
 
 # ---------------------------------------------------------------------------
@@ -73,8 +79,14 @@ Symlink mode:
   own there, so --help reaches the tool; this help is for direct mode only.
   The vault is <account>-<purpose>-<access>; vault-naming.sh sets the purpose
   and the default access, and AGENT_VAULT_WRAPPER_ACCESS overrides the access.
-  envs/<tool>.env is loaded after common.env if it exists.
     ln -s agent-vault-wrapper ~/.local/bin/gh-drounin
+
+  After common.env, the tool gets the envs listed in tools/<tool> (if it
+  exists), then its own envs/<tool>.env (if it exists). tools/<tool> names
+  shared envs/ files the way --env-name does, one per line, in order; blank
+  lines and lines starting with '#' are ignored. For example tools/bash:
+    gh
+    git-https
 
 Options (direct mode):
   --vault <name>      Vault to scope the session to (required)
@@ -89,9 +101,11 @@ Options (direct mode):
                       those files to stubs.
   --help, -h          Show this help and exit
 
-Variables apply in order, later values overriding earlier ones (with a
-warning): envs/common.env first, then --env, --env-file, --env-name and
---env-all as given.
+Variables apply in this order: envs/common.env, then --env-file,
+--env-name and --env-all as given, then every --env. Env files must not
+overlap: a key set by two of them warns, naming both places, and the later
+value is used until the config is fixed. --env is the override channel: it
+wins over any file wherever it appears on the command line, and still warns.
 
 Env file format: one KEY=VALUE per line. The value is everything after the
 first '=', taken literally (no quotes, no expansion). Blank lines and lines
@@ -101,7 +115,8 @@ Environment:
   AGENT_VAULT_BIN          Path to the agent-vault binary.
                            Default: $_AGENT_VAULT_BIN
   AGENT_VAULT_WRAPPER_DIR  Config directory. Its envs/ must exist (it may be
-                           empty); envs/common.env is read from it.
+                           empty); envs/common.env is read from it. Its
+                           tools/ is optional.
                            Default: $_WRAPPER_DIR
   AGENT_VAULT_WRAPPER_ACCESS
                            Access part of the vault name in symlink mode.
@@ -115,11 +130,16 @@ EOF
 # ---------------------------------------------------------------------------
 # Environment handling
 # ---------------------------------------------------------------------------
+# A key set twice always warns, even with the same value, and the later value
+# is used. Env files must not overlap, so a file over a file is a config error;
+# --env (origin "--env") is the override channel and may be intended. --env
+# loads last, so a file never replaces an --env value.
 set_var() {
   local _key="$1"
   local _value="$2"
   local _origin="$3"
   local _count="${#_ENV_KEYS[@]}"
+  local _prev
   local _i
 
   [[ "$_key" =~ $_VAR_NAME_RE ]] \
@@ -127,13 +147,22 @@ set_var() {
 
   for (( _i = 0; _i < _count; _i++ )); do
     if [[ "${_ENV_KEYS[$_i]}" == "$_key" ]]; then
-      warn "$_key overridden by $_origin"
+      _prev="${_ENV_ORIGINS[$_i]}"
+      if [[ "$_origin" != --env ]]; then
+        warn "$_key set in $_prev and $_origin; using $_origin (fix the config)"
+      elif [[ "$_prev" == --env ]]; then
+        warn "$_key given twice with --env; using the last"
+      else
+        warn "$_key from $_prev overridden by --env"
+      fi
       _ENV_ARGS[_i]="${_key}=${_value}"
+      _ENV_ORIGINS[_i]="$_origin"
       return
     fi
   done
   _ENV_KEYS+=("$_key")
   _ENV_ARGS+=("${_key}=${_value}")
+  _ENV_ORIGINS+=("$_origin")
 }
 
 add_env() {
@@ -213,14 +242,60 @@ load_env() {
     load_env_file "$_common"
   fi
 
+  # Env files in the order given, then --env: it is the override channel, so
+  # it wins wherever it appears on the command line.
   for _source in ${_SOURCES[@]+"${_SOURCES[@]}"}; do
     case "$_source" in
-      env:*)  add_env "${_source#env:}" ;;
       file:*) load_env_file "${_source#file:}" ;;
       name:*) load_env_name "${_source#name:}" ;;
       all:*)  load_env_all ;;
     esac
   done
+  for _source in ${_SOURCES[@]+"${_SOURCES[@]}"}; do
+    case "$_source" in
+      env:*)  add_env "${_source#env:}" ;;
+    esac
+  done
+}
+
+# tools/<tool> lists the shared envs/ files a symlink-mode tool loads, by name
+# as for --env-name, one per line and in order. They are queued before the
+# tool's own envs/<tool>.env. A line naming common or the tool itself (both
+# always load) or repeating an earlier line would only duplicate keys, so it
+# warns and is skipped rather than blocking the launch.
+load_tool_manifest() {
+  local _file="$1"
+  local _tool="$2"
+  local _line
+  local _lineno=0
+  local _seen=()
+  local _name
+  local LC_ALL=C
+
+  [[ -r "$_file" ]] || fatal "Tool manifest not readable: $_file"
+
+  while IFS= read -r _line || [[ -n "$_line" ]]; do
+    _lineno=$(( _lineno + 1 ))
+    if [[ "$_line" =~ $_BLANK_OR_COMMENT_RE ]]; then
+      continue
+    fi
+    [[ "$_line" =~ $_ENV_NAME_RE ]] \
+      || fatal "$_file:$_lineno: invalid env name '$_line' (letters, digits, '.', '_', '-', with '/' between non-empty components; a component may not start with '.')"
+    if [[ "$_line" == common || "$_line" == "$_tool" ]]; then
+      warn "$_file:$_lineno: '$_line' always loads; skipped"
+      continue
+    fi
+    for _name in ${_seen[@]+"${_seen[@]}"}; do
+      if [[ "$_name" == "$_line" ]]; then
+        warn "$_file:$_lineno: '$_line' already listed; skipped"
+        continue 2
+      fi
+    done
+    [[ -f "$_ENV_DIR/$_line.env" ]] \
+      || fatal "$_file:$_lineno: no env file named '$_line': $_ENV_DIR/$_line.env"
+    _seen+=("$_line")
+    _SOURCES+=("file:$_ENV_DIR/$_line.env")
+  done < "$_file"
 }
 
 
@@ -300,9 +375,12 @@ configure_symlink() {
   local _self="${0##*/}"
   local _tool="${_self%%-*}"
   local _account="${_self#*-}"
+  local LC_ALL=C
 
   [[ "$_self" == *-* && -n "$_tool" && -n "$_account" ]] \
     || fatal "Invoked as '$_self'; expected <tool>-<account>"
+  [[ "$_tool" =~ $_TOOL_RE ]] \
+    || fatal "Invalid tool name '$_tool' (letters, digits, '.', '_'; may not start with '.')"
 
   load_naming_lib
   _VAULT="$(vault_name "$_account" "$WRAPPER_DEFAULT_PURPOSE" \
@@ -311,6 +389,11 @@ configure_symlink() {
   _CMD_ARGS=("$@")
   check_cmd
 
+  # Shared envs from the manifest, then the tool's own, so its values come
+  # last while an overlap is being fixed.
+  if [[ -f "$_TOOLS_DIR/$_tool" ]]; then
+    load_tool_manifest "$_TOOLS_DIR/$_tool" "$_tool"
+  fi
   if [[ -f "$_ENV_DIR/$_tool.env" ]]; then
     _SOURCES+=("file:$_ENV_DIR/$_tool.env")
   fi
