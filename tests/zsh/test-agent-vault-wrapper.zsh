@@ -13,7 +13,7 @@ source "$_SCRIPT_DIR/ztester.zsh"
 # faketool-drounin is a symlink to the wrapper for symlink mode.
 _REPO_HOME="$(cd "$_SCRIPT_DIR/../../home" && pwd)"
 _WRAPPER="$_REPO_HOME/.local/bin/agent-vault-wrapper"
-_VAULT=drounin-agent-read-only
+_VAULT=drounin-user-full
 
 () {
   local _test_script_name
