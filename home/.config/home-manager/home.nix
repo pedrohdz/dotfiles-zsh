@@ -54,6 +54,10 @@ let
   # GoReleaser's signed release binaries. See pkgs/agent-vault.nix.
   agent-vault = pkgs.callPackage ./pkgs/agent-vault.nix { };
 
+  # Cloudflare's unified CLI, in technical preview and not in nixpkgs yet;
+  # packaged locally from its npm tarball. See pkgs/cf/default.nix.
+  cf = pkgs.callPackage ./pkgs/cf { };
+
 in {
   # Home Manager needs a bit of information about you and the paths it should
   # manage.
@@ -108,6 +112,7 @@ in {
     bash-completion
     bat
     bump2version
+    cf
     cmake
     coreutils
     curl
