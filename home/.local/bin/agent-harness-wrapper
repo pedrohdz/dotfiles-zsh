@@ -83,9 +83,11 @@ Symlink mode:
     ln -s agent-harness-wrapper ~/.local/bin/claude-drounin
 
 The account directory must already exist; --init creates it. The environment
-for the harness is every stub in agent-vault-wrapper's envs/ (--env-all), then this script's own
-envs/*.env, then AGENT_HARNESS_ACCOUNT (the account name) and the harness's
-state variable(s); later values win.
+for the harness is every stub in agent-vault-wrapper's envs/ (--env-all), then
+this script's own envs/*.env, then AGENT_HARNESS_ACCOUNT (the account name) and
+the harness's state variable(s) as --env. The env files must not overlap
+(agent-vault-wrapper warns if they do); the --env values override them, also
+with a warning.
 
 --init creates <state root>/accounts/<account>/<harness> (mode 700, with
 GNU install) and fails if it already exists. It does not start the harness:
